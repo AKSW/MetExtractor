@@ -61,9 +61,6 @@ public class DescriberAndExtractor {
 
 	public void addEndpoint(String endpointUri) {
 		Endpoint endpoint = new Endpoint(endpointUri, model);
-		if (endpoints.contains(endpoint)) {
-			System.err.println("duplicate");
-		}
 		endpoints.add(endpoint);
 	}
 

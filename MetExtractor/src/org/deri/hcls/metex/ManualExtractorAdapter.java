@@ -6,6 +6,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.jena.atlas.web.HttpException;
+import org.deri.hcls.Endpoint;
+import org.deri.hcls.QueryExecutionException;
+import org.deri.hcls.vocabulary.VOID;
+import org.deri.hcls.vocabulary.VOIDX;
+import org.deri.hcls.vocabulary.Vocabularies;
 
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
@@ -15,13 +20,18 @@ import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
 
-import ie.deri.hcls.Endpoint;
-import ie.deri.hcls.QueryExecutionException;
-import ie.deri.hcls.vocabulary.VOID;
-import ie.deri.hcls.vocabulary.VOIDX;
-import ie.deri.hcls.vocabulary.Vocabularies;
-
-public class ManualExtractorAdapter implements WebServiceAdapter {
+/**
+ * This method “manually” extracts meta information from the endpoint.
+ * 
+ * Some queries are taken from the void-impl project
+ * (https://code.google.com/p/void-impl/wiki/SPARQLQueriesForStatistics)
+ * 
+ * Supports endpoint metadata (service level)
+ * 
+ * @author natanael
+ * 
+ */
+public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 
 	private Model model;
 
@@ -31,62 +41,100 @@ public class ManualExtractorAdapter implements WebServiceAdapter {
 
 	@Override
 	public Model getMetadata(String endpointUri) throws IOException {
-		return getMetadata(new Endpoint(endpointUri, model));
+		return getMetadata(endpointUri, null);
 	}
 
 	@Override
 	public Model getMetadata(Endpoint endpoint) throws IOException {
+		return getMetadata(endpoint, null);
+	}
+
+	@Override
+	public Model getMetadata(String endpointUri, Collection<String> properties)
+			throws IOException {
+		return getMetadata(new Endpoint(endpointUri, model), properties);
+	}
+
+	@Override
+	public Model getMetadata(Endpoint endpoint,
+			Collection<String> targetProperties) throws IOException {
 		Resource endpointResource = model.createResource(endpoint.getUri());
 		Collection<String> missingProperties = getListOfMissingProperties(
-				endpointResource, null);
+				endpointResource, targetProperties);
+
+		if (missingProperties == null) {
+			// TODO somehow execute all queries
+			// for now throw an Exception
+			throw new IOException("no targetProperties specified");
+		} else {
+			System.err.println("Missing Properties are:");
+			for(String prop : missingProperties) {
+				System.err.println(prop);
+			}
+		}
 
 		for (String property : missingProperties) {
 			try {
 				if (property.equals(VOID.triples.getURI())) {
+					Literal countLiteral = getTripleCount(endpoint);
+					endpointResource.addProperty(VOID.triples, countLiteral);
 
 				} else if (property.equals(VOID.entities.getURI())) {
+					Literal countLiteral = getEntitiyCount(endpoint);
+					endpointResource.addProperty(VOID.classes, countLiteral);
 
 				} else if (property.equals(VOID.classes.getURI())) {
-					int classCount = getClassCount(endpoint);
-					Literal countLiteral = model.createTypedLiteral(classCount);
+					Literal countLiteral = getClassCount(endpoint);
 					endpointResource.addProperty(VOID.classes, countLiteral);
+
 				} else if (property.equals(VOID.properties.getURI())) {
+					Literal countLiteral = getPropertyCount(endpoint);
+					endpointResource.addProperty(VOID.properties, countLiteral);
 
 				} else if (property.equals(VOID.distinctSubjects.getURI())) {
+					Literal countLiteral = getSubjectCount(endpoint);
+					endpointResource.addProperty(VOID.distinctSubjects,
+							countLiteral);
 
 				} else if (property.equals(VOID.distinctObjects.getURI())) {
+					Literal countLiteral = getObjectCount(endpoint);
+					endpointResource.addProperty(VOID.distinctObjects,
+							countLiteral);
 
 				} else if (property.equals(VOIDX.blankNodeCount.getURI())) {
-					int bnodeCount = getBnodeCount(endpoint);
-					Literal countLiteral = model.createTypedLiteral(bnodeCount);
+					Literal countLiteral = getBnodeCount(endpoint);
 					endpointResource.addProperty(VOIDX.blankNodeCount,
 							countLiteral);
+
+				} else if (property.equals(VOIDX.namespaceCount.getURI())) {
+					// TODO
+					int namespaceCount = 0;
+					Literal countLiteral = model
+							.createTypedLiteral(namespaceCount);
+					endpointResource.addProperty(VOIDX.namespaceCount,
+							countLiteral);
+
 				} else if (property.equals(Vocabularies.sd_endpoint.getURI())) {
 					endpointResource.addProperty(Vocabularies.sd_endpoint,
 							endpointResource);
 				}
 			} catch (QueryExecutionException e) {
-				e.printStackTrace();
+				System.err.println("Manual extraction of value for " + property
+						+ " failed.");
 			}
 		}
 
-		return null;
-	}
+		model.commit();
 
-	@Override
-	public String getTitle(String endpoint) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Collection<String> getAllEndpoints() throws IOException {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	private Collection<String> getListOfMissingProperties(Resource resource,
 			Collection<String> targetProperties) {
+		if (targetProperties == null) {
+			return null;
+		}
+
 		Model model = ModelFactory.createDefaultModel();
 		Set<String> missingProperties = new HashSet<String>();
 		for (String predicateUri : targetProperties) {
@@ -98,13 +146,56 @@ public class ManualExtractorAdapter implements WebServiceAdapter {
 		return missingProperties;
 	}
 
-	private int getClassCount(Endpoint endpoint) throws QueryExecutionException {
+	private Literal getTripleCount(Endpoint endpoint)
+			throws QueryExecutionException {
+		String query = "SELECT (COUNT(*) AS ?count) { ?s ?p ?o  }";
+		return executeCountQuery(query, endpoint);
+	}
 
+	private Literal getEntitiyCount(Endpoint endpoint)
+			throws QueryExecutionException {
+		String query = "SELECT (COUNT(distinct ?s) AS ?count) { ?s a []  }";
+		return executeCountQuery(query, endpoint);
+	}
+
+	private Literal getClassCount(Endpoint endpoint)
+			throws QueryExecutionException {
+		String query = "select (count( distinct ?class) as ?count) { [] a ?class } ";
+		return executeCountQuery(query, endpoint);
+	}
+
+	private Literal getPropertyCount(Endpoint endpoint)
+			throws QueryExecutionException {
+		String query = "SELECT (count(distinct ?p) as ?count) { ?s ?p ?o } ";
+		return executeCountQuery(query, endpoint);
+	}
+
+	private Literal getSubjectCount(Endpoint endpoint)
+			throws QueryExecutionException {
+		String query = "SELECT (count(distinct ?s) as ?count) { ?s ?p ?o } ";
+		return executeCountQuery(query, endpoint);
+	}
+
+	private Literal getObjectCount(Endpoint endpoint)
+			throws QueryExecutionException {
+		String query = "SELECT (count(distinct ?o) as ?count) { ?s ?p ?o } ";
+		return executeCountQuery(query, endpoint);
+	}
+
+	private Literal getBnodeCount(Endpoint endpoint)
+			throws QueryExecutionException {
 		String query = "";
-		query += "select  (count( distinct ?class) as ?totalClassCount) { ";
-		query += "	[] a ?class ";
-		query += "} ";
+		query += "select (count(distinct ?bn) as ?count) { ";
+		query += " { ?bn ?p ?o . filter(isBlank(?bn)) } union ";
+		query += " { ?s ?bn ?o . filter(isBlank(?bn)) } union ";
+		query += " { ?s ?p ?bn . filter(isBlank(?bn)) } ";
+		query += "}";
 
+		return executeCountQuery(query, endpoint);
+	}
+
+	private Literal executeCountQuery(String query, Endpoint endpoint)
+			throws QueryExecutionException {
 		try {
 			ResultSet results = endpoint.execSelect(query);
 
@@ -112,7 +203,8 @@ public class ManualExtractorAdapter implements WebServiceAdapter {
 				QuerySolution result = results.next();
 
 				try {
-					return result.getLiteral("totalClassCount").getInt();
+					int count = result.getLiteral("count").getInt();
+					return model.createTypedLiteral(count);
 				} catch (Exception e) {
 					// totalClassCount was not a Literal
 				}
@@ -121,13 +213,22 @@ public class ManualExtractorAdapter implements WebServiceAdapter {
 			e.printStackTrace();
 		}
 
-		return -1;
+		return null;
 	}
 
-	private int getBnodeCount(Endpoint endpoint) {
-		String query = "select count(?bn) {"
-				+ "{ ?bn ?p ?o . filter(isBlank(?bn))} union {?s ?bn ?o . filter(isBlank(?bn)) } union {?s ?p ?bn . filter(isBlank(?bn))}"
-				+ " }	LIMIT 1000";
-		return 0;
+	@Override
+	public String getServiceLink(String endpointUri) {
+		// there is not service link
+		return null;
+	}
+
+	@Override
+	public String getServiceUri() {
+		return "http://localhost/byqueries";
+	}
+
+	@Override
+	public boolean isAvailable() {
+		return true;
 	}
 }

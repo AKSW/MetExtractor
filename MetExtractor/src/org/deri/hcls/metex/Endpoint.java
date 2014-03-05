@@ -1,13 +1,5 @@
 package org.deri.hcls.metex;
 
-import ie.deri.hcls.BlankNodeException;
-import ie.deri.hcls.LinkeddataHelper;
-import ie.deri.hcls.QueryExecutionException;
-import ie.deri.hcls.ResourceHelper;
-import ie.deri.hcls.vocabulary.VOID;
-import ie.deri.hcls.vocabulary.VOIDX;
-import ie.deri.hcls.vocabulary.Vocabularies;
-
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
@@ -21,9 +13,17 @@ import java.util.Set;
 
 import org.apache.jena.atlas.web.HttpException;
 import org.apache.jena.riot.RiotException;
+import org.deri.hcls.BlankNodeException;
+import org.deri.hcls.LinkeddataHelper;
+import org.deri.hcls.QueryExecutionException;
+import org.deri.hcls.ResourceHelper;
+import org.deri.hcls.vocabulary.VOID;
+import org.deri.hcls.vocabulary.VOIDX;
+import org.deri.hcls.vocabulary.Vocabularies;
 
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
+import com.hp.hpl.jena.rdf.model.Literal;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
@@ -39,17 +39,17 @@ import com.hp.hpl.jena.vocabulary.DCTerms;
 import com.hp.hpl.jena.vocabulary.RDF;
 import com.hp.hpl.jena.vocabulary.RDFS;
 
-public class Endpoint extends ie.deri.hcls.Endpoint {
+public class Endpoint extends org.deri.hcls.Endpoint {
 
 	/**
 	 * The properties, we use in out data model to describe datasets
 	 */
-	private static ArrayList<String> datasetProperties = new ArrayList<String>();
+	public static ArrayList<String> datasetProperties = new ArrayList<String>();
 
 	/**
 	 * The properties, we fetch, but which will be mapped to datasetProperties
 	 */
-	private static ArrayList<String> datasetFetchProperties = new ArrayList<String>();
+	public static ArrayList<String> datasetFetchProperties = new ArrayList<String>();
 
 	static {
 		datasetProperties.add(RDFS.label.getURI());
@@ -74,6 +74,7 @@ public class Endpoint extends ie.deri.hcls.Endpoint {
 		datasetProperties.add(VOID.distinctSubjects.getURI());
 		datasetProperties.add(VOID.distinctObjects.getURI());
 		datasetProperties.add(VOID.exampleResource.getURI());
+		datasetProperties.add(VOID.uriRegexPattern.getURI());
 		datasetProperties.add(VOID.NS + "rootResource");
 		datasetFetchProperties.add("http://bio2rdf.org/dcat:distribution");
 		datasetFetchProperties
@@ -95,12 +96,12 @@ public class Endpoint extends ie.deri.hcls.Endpoint {
 	/**
 	 * The properties, we use in out data model to describe endpoints
 	 */
-	private static ArrayList<String> endpointProperties = new ArrayList<String>();
+	public static ArrayList<String> endpointProperties = new ArrayList<String>();
 
 	/**
 	 * The properties, we fetch, but which will be mapped to endpointProperties
 	 */
-	private static ArrayList<String> endpointFetchProperties = new ArrayList<String>();
+	public static ArrayList<String> endpointFetchProperties = new ArrayList<String>();
 
 	static {
 		endpointProperties.add("http://www.w3.org/2000/01/rdf-schema#label");
@@ -118,9 +119,11 @@ public class Endpoint extends ie.deri.hcls.Endpoint {
 		endpointProperties.add(VOID.distinctSubjects.getURI());
 		endpointProperties.add(VOID.distinctObjects.getURI());
 		endpointProperties.add(VOIDX.blankNodeCount.getURI());
-		
+		endpointProperties.add(VOIDX.namespaceCount.getURI());
+		endpointProperties.add(VOIDX.datasetCount.getURI());
+
 		endpointFetchProperties
-		.add("http://bio2rdf.org/dataset_vocabulary:has_url");
+				.add("http://bio2rdf.org/dataset_vocabulary:has_url");
 		endpointFetchProperties
 				.add("http://bio2rdf.org/dataset_vocabulary:has_triple_count");
 		endpointFetchProperties
@@ -139,9 +142,10 @@ public class Endpoint extends ie.deri.hcls.Endpoint {
 		endpointFetchProperties.addAll(endpointProperties);
 	}
 
-	private static Map<String, String> termSubstitutions = new HashMap<String, String>();
+	public static Map<String, String> termSubstitutions = new HashMap<String, String>();
 	static {
-		termSubstitutions.put("http://www.w3.org/ns/sparql-service-description#url",
+		termSubstitutions.put(
+				"http://www.w3.org/ns/sparql-service-description#url",
 				Vocabularies.sd_endpoint.getURI());
 		termSubstitutions.put("http://bio2rdf.org/dataset_vocabulary:has_url",
 				Vocabularies.sd_endpoint.getURI());
@@ -215,7 +219,7 @@ public class Endpoint extends ie.deri.hcls.Endpoint {
 			System.err.println("endpoint: " + getUri()
 					+ " not available, response was: " + e.getResponseCode()
 					+ " with message: " + e.getResponseMessage());
-			endpointResource.addLiteral(VOIDX.HTTP_RETURN_CODE,
+			endpointResource.addLiteral(VOIDX.httpReturnCode,
 					e.getResponseCode());
 			String message = e.getMessage();
 			if (message != null) {
@@ -312,12 +316,20 @@ public class Endpoint extends ie.deri.hcls.Endpoint {
 
 			System.err.println("Found " + datasets.size() + " datasets");
 
-			if (datasets.size() > 10) {
-				// get number of datasets
+			Literal countLiteral;
+			int datasetCount = datasets.size();
+			if (datasetCount > 10) {
+				// TODO get number of datasets
+				String datasetCountNote = datasetCount + "+";
+				countLiteral = model.createTypedLiteral(datasetCountNote);
+			} else {
+				countLiteral = model.createTypedLiteral(datasetCount);
 			}
 
+			endpointResource.addProperty(VOIDX.datasetCount, countLiteral);
+
 			for (Resource dataset : datasets) {
-				model.add(endpointResource, VOIDX.PROVIDES_ACCESS_TO, dataset);
+				model.add(endpointResource, VOIDX.providesAccessTo, dataset);
 				StmtIterator properties = dataset.listProperties();
 				model.add(properties);
 			}
@@ -423,7 +435,6 @@ public class Endpoint extends ie.deri.hcls.Endpoint {
 						+ " ignorring this");
 				continue;
 			}
-
 
 			int index;
 			if ((index = datasets.indexOf(dataset)) > 0) {

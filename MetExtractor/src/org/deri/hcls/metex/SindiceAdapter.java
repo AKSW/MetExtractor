@@ -1,15 +1,14 @@
 package org.deri.hcls.metex;
 
-import ie.deri.hcls.QueryExecutionException;
-import ie.deri.hcls.ResourceHelper;
-import ie.deri.hcls.vocabulary.VOIDX;
-import ie.deri.hcls.Endpoint;
-
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
+import org.deri.hcls.Endpoint;
+import org.deri.hcls.QueryExecutionException;
+import org.deri.hcls.ResourceHelper;
+import org.deri.hcls.vocabulary.VOIDX;
 import org.sindice.summary.simple.AbstractSimpleQuery.Structure;
 import org.sindice.summary.simple.HTTPSimpleQuery;
 
@@ -26,7 +25,7 @@ import com.hp.hpl.jena.sparql.engine.http.QueryExceptionHTTP;
 import com.hp.hpl.jena.sparql.resultset.ResultSetException;
 import com.hp.hpl.jena.vocabulary.RDFS;
 
-public class SindiceAdapter implements WebServiceAdapter {
+public class SindiceAdapter implements ExtractorServiceAdapter {
 
 	private Map<String, String> domainStructures = new HashMap<String, String>();
 
@@ -36,6 +35,12 @@ public class SindiceAdapter implements WebServiceAdapter {
 
 	public SindiceAdapter(Model model) {
 		this.model = model;
+	}
+
+	@Override
+	public Model getMetadata(Endpoint endpoint, Collection<String> properties)
+			throws IOException {
+		return getMetadata(endpoint);
 	}
 
 	@Override
@@ -54,15 +59,9 @@ public class SindiceAdapter implements WebServiceAdapter {
 	}
 
 	@Override
-	public String getTitle(String endpoint) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Set<String> getAllEndpoints() throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+	public Model getMetadata(String endpoint, Collection<String> properties)
+			throws IOException {
+		return getMetadata(endpoint);
 	}
 
 	public void getSindiceSummary(String endpointUri) throws Exception {
@@ -85,6 +84,7 @@ public class SindiceAdapter implements WebServiceAdapter {
 							.replaceAll("<([^>]*)>", "$1"));
 				} else {
 					rangeResource = RDFS.Literal;
+					continue;
 				}
 
 				String domainStructureUri = getDomainStructure(model,
@@ -95,7 +95,7 @@ public class SindiceAdapter implements WebServiceAdapter {
 				if (domainStructureUri == null) {
 					domainStructureResource = ResourceHelper
 							.createRandomResource(model);
-					endpointResource.addProperty(VOIDX.HAS_STRUCTURE,
+					endpointResource.addProperty(VOIDX.hasStructure,
 							domainStructureResource);
 					domainStructureResource.addProperty(VOIDX.DOMAIN,
 							domainResource);
@@ -109,7 +109,7 @@ public class SindiceAdapter implements WebServiceAdapter {
 				if (predicateStructureUri == null) {
 					predicateStructureResource = ResourceHelper
 							.createRandomResource(model);
-					domainStructureResource.addProperty(VOIDX.HAS_PREDICATE,
+					domainStructureResource.addProperty(VOIDX.hasPredicate,
 							predicateStructureResource);
 					predicateStructureResource.addProperty(VOIDX.PREDICATE,
 							predicateResource);
@@ -197,6 +197,22 @@ public class SindiceAdapter implements WebServiceAdapter {
 		} catch (QueryParseException | ResultSetException | QueryExceptionHTTP e) {
 			throw new QueryExecutionException(query, e);
 		}
+	}
+
+	@Override
+	public String getServiceLink(String endpointUri) {
+		// there is no service link
+		return null;
+	}
+
+	@Override
+	public String getServiceUri() {
+		return "https://github.com/sindice/sparqled/tree/master/sparql-summary";
+	}
+
+	@Override
+	public boolean isAvailable() {
+		return true;
 	}
 
 }

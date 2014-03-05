@@ -1,11 +1,10 @@
 package org.deri.hcls.metex;
 
-import ie.deri.hcls.vocabulary.Vocabularies;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,27 +13,34 @@ import java.util.Map;
 import org.apache.jena.atlas.json.JSON;
 import org.apache.jena.atlas.json.JsonObject;
 import org.apache.jena.atlas.json.JsonValue;
+import org.deri.hcls.Endpoint;
+import org.deri.hcls.vocabulary.VOID;
+import org.deri.hcls.vocabulary.Vocabularies;
 
+import com.hp.hpl.jena.rdf.model.Literal;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
+import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.sparql.vocabulary.FOAF;
 import com.hp.hpl.jena.vocabulary.DC;
 import com.hp.hpl.jena.vocabulary.DCTerms;
+import com.hp.hpl.jena.vocabulary.RDF;
 
-import ie.deri.hcls.Endpoint;
-
-public class DatahubAdapter implements WebServiceAdapter {
+public class DatahubAdapter implements ExtractorServiceAdapter,
+		EndpointListProviderAdapter {
 
 	private static final String API_BASE = "http://datahub.io/api/2/";
 	private static final String ENDPOINT_LIST_URL = API_BASE
 			+ "search/resource?format=api/sparql&all_fields=1&limit=1000";
 	private static final String DATASET_BASE = API_BASE + "rest/dataset/";
+	private static final String RESOURCE_SEARCH_BASE = API_BASE
+			+ "search/resource";
 
 	private static Map<String, String> endpointIds = new HashMap<String, String>();
+	private static Map<String, String> packageIds = new HashMap<String, String>();
 
 	public DatahubAdapter() {
-		// TODO Auto-generated constructor stub
 	}
 
 	@Override
@@ -43,8 +49,14 @@ public class DatahubAdapter implements WebServiceAdapter {
 	}
 
 	@Override
+	public Model getMetadata(Endpoint endpoint, Collection<String> properties)
+			throws IOException {
+		return getMetadata(endpoint);
+	}
+
+	@Override
 	public Model getMetadata(String endpointUri) throws IOException {
-		String endpointId = endpointIds.get(endpointUri);
+		String endpointId = getPackageId(endpointUri);
 		URL url = new URL(DATASET_BASE + endpointId);
 		URLConnection conn = url.openConnection();
 		InputStream inputstream = conn.getInputStream();
@@ -64,31 +76,42 @@ public class DatahubAdapter implements WebServiceAdapter {
 						 * TODO see what metadata we can use
 						 */
 					} else if (format.equals("meta/void")) {
-						Resource datasetResource = readDatasetMetaFromJson(metadataJson,
-								resource.getAsObject(), model);
-						Resource endpointResource = model.createResource(endpointUri);
-						endpointResource.addProperty(Vocabularies.sd_defaultDataset, datasetResource);
+						Resource datasetResource = readDatasetMetaFromJson(
+								metadataJson, resource.getAsObject(), model);
+						Resource endpointResource = model
+								.createResource(endpointUri);
+						endpointResource
+								.addProperty(Vocabularies.sd_defaultDataset,
+										datasetResource);
+						datasetResource.addProperty(RDF.type, VOID.Dataset);
+						datasetResource.addProperty(VOID.sparqlEndpoint,
+								endpointResource);
 					}
 				}
 			}
 		}
 
 		/*
-		 * TODO see how we can use the dataset level metadat
+		 * TODO see how we can use the dataset level metadata
 		 */
 
-		return null;
+		return model;
 	}
 
 	@Override
-	public String getTitle(String endpoint) {
-		// TODO Auto-generated method stub
-		return null;
+	public Model getMetadata(String endpoint, Collection<String> properties)
+			throws IOException {
+		return getMetadata(endpoint);
+	}
+
+	@Override
+	public Collection<String> getSomeEndpoints(int limit) throws IOException {
+		return getEndpoints(limit);
 	}
 
 	@Override
 	public Collection<String> getAllEndpoints() throws IOException {
-		return getEndpoints(10);
+		return getEndpoints(0);
 	}
 
 	public Collection<String> getEndpoints(int max) throws IOException {
@@ -113,19 +136,29 @@ public class DatahubAdapter implements WebServiceAdapter {
 				JsonValue result = inputIterator.next();
 				if (result.isObject()) {
 					JsonValue urlValue = result.getAsObject().get("url");
-					JsonValue idValue = result.getAsObject().get("package_id");
-					if (urlValue.isString() && idValue.isString()) {
+					JsonValue idValue = result.getAsObject().get("id");
+					JsonValue pidValue = result.getAsObject().get("package_id");
+					if (urlValue.isString() && pidValue.isString()
+							&& idValue.isString()) {
 						String endpointUri = urlValue.getAsString().value()
 								.trim();
 						String endpointId = idValue.getAsString().value();
+						String packageId = pidValue.getAsString().value();
 
 						if (endpointIds.containsKey(endpointId)) {
 							System.err.println("id: " + endpointId
 									+ " used by multiple endpoints. "
-									+ endpointUri + " and "
-									+ endpointIds.get(endpointId));
+									+ endpointUri + " and ?");
 						} else {
-							endpointIds.put(endpointId, endpointUri);
+							endpointIds.put(endpointUri, endpointId);
+						}
+
+						if (packageIds.containsKey(packageId)) {
+							System.err.println("pid: " + packageId
+									+ " used by multiple endpoints. "
+									+ endpointUri + " and ?");
+						} else {
+							packageIds.put(endpointUri, packageId);
 						}
 					}
 				}
@@ -136,12 +169,47 @@ public class DatahubAdapter implements WebServiceAdapter {
 				}
 			}
 		}
-		return endpointIds.values();
+		return endpointIds.keySet();
+	}
+
+	private String getEndpointId(String uri) {
+		if (endpointIds.isEmpty()) {
+			getIds(uri);
+		}
+		return endpointIds.get(uri);
+	}
+
+	private String getPackageId(String uri) {
+		if (endpointIds.isEmpty()) {
+			getIds(uri);
+		}
+		return endpointIds.get(uri);
+	}
+
+	private void getIds(String uri) {
+		try {
+			URL url = new URL(RESOURCE_SEARCH_BASE + "?url="
+					+ URLEncoder.encode(uri, "UTF-8") + "&all_fields=1");
+			URLConnection conn = url.openConnection();
+			InputStream inputstream = conn.getInputStream();
+
+			JsonObject resultObject = JSON.parse(inputstream);
+			JsonObject result = resultObject.get("results").getAsArray().get(0)
+					.getAsObject();
+			String id = result.get("id").getAsString().value();
+			String pid = result.get("package_id").getAsString().value();
+			endpointIds.put(uri, id);
+			packageIds.put(uri, pid);
+		} catch (Exception e) {
+			try {
+				getAllEndpoints();
+			} catch (IOException ee) {
+			}
+		}
 	}
 
 	private Resource readDatasetMetaFromJson(JsonObject jsonRoot,
 			JsonObject resource, Model model) {
-
 
 		JsonValue urlValue = resource.get("url");
 		if (!urlValue.isString()) {
@@ -151,35 +219,132 @@ public class DatahubAdapter implements WebServiceAdapter {
 		String uri = urlValue.getAsString().value().trim();
 		Resource datasetResource = null;
 		if (uri.length() > 0) {
-			String description = resource.get("description").getAsString().value();
-			String name = resource.get("name").getAsString().value();
-			String title = jsonRoot.get("title").getAsString().value();
-			String license_title = jsonRoot.get("license_title").getAsString().value();
-			String license = jsonRoot.get("license").getAsString().value();
-			String license_id = jsonRoot.get("license_id").getAsString().value();
-			String license_url = jsonRoot.get("license_url").getAsString().value();
-			String maintainer = jsonRoot.get("maintainer").getAsString().value();
-			String maintainer_email = jsonRoot.get("maintainer_email").getAsString().value();
-			String author = jsonRoot.get("author").getAsString().value();
-			String author_email = jsonRoot.get("author_email").getAsString().value();
-			String version = jsonRoot.get("version").getAsString().value();
-			String notes_rendered = jsonRoot.get("notes_rendered").getAsString().value();
-			String homepage = jsonRoot.get("url").getAsString().value();
-			
+			JsonObject extras = jsonRoot.get("extras").getAsObject();
+
 			datasetResource = model.createResource(uri);
-			datasetResource.addProperty(DC.description, description);
-			datasetResource.addProperty(DC.title, title);
-			datasetResource.addProperty(DCTerms.license, model.createResource(license_url));
-			datasetResource.addProperty(DCTerms.creator, "\"" + author + "\" <" + author_email + ">");
-			datasetResource.addProperty(DCTerms.created, version);
-			datasetResource.addProperty(DC.description, notes_rendered);
-			datasetResource.addProperty(FOAF.homepage, homepage);
-			
+
+			setStringPropertyFromJson(datasetResource, DC.description,
+					resource.get("description"));
+			// setStringPropertyFromJson(datasetResource, DC.title,
+			// jsonRoot.get("name"));
+			setStringPropertyFromJson(datasetResource, DC.title,
+					jsonRoot.get("title"));
+
+			// setStringPropertyFromJson(datasetResource, DCTerms.license,
+			// jsonRoot.get("license_title"));
+			// setStringPropertyFromJson(datasetResource, DCTerms.license,
+			// jsonRoot.get("license"));
+			// setStringPropertyFromJson(datasetResource, DCTerms.license,
+			// jsonRoot.get("license_id"));
+			setResourcePropertyFromJson(datasetResource, DCTerms.license,
+					jsonRoot.get("license_url"));
+
+			setStringPropertyFromJson(datasetResource, DCTerms.created,
+					jsonRoot.get("version"));
+			setStringPropertyFromJson(datasetResource, DC.description,
+					jsonRoot.get("notes_rendered"));
+			setResourcePropertyFromJson(datasetResource, FOAF.homepage,
+					jsonRoot.get("url"));
+			setIntPropertyFromJson(datasetResource, VOID.triples,
+					extras.get("triples"));
+			setResourcePropertyFromJson(datasetResource, VOID.uriSpace,
+					extras.get("namespace"));
+
+			try {
+				String maintainer = jsonRoot.get("maintainer").getAsString()
+						.value();
+				String maintainer_email = jsonRoot.get("maintainer_email")
+						.getAsString().value();
+				String author = jsonRoot.get("author").getAsString().value();
+				String author_email = jsonRoot.get("author_email")
+						.getAsString().value();
+
+				datasetResource.addProperty(DCTerms.creator, "\"" + author
+						+ "\" <" + author_email + ">");
+			} catch (Exception e) {
+			}
+
 			/*
-			 * TODO also extract tags
+			 * TODO also extract tags for categories
 			 */
 		}
 
 		return datasetResource;
+	}
+
+	private void setStringPropertyFromJson(Resource resource,
+			Property property, JsonValue jsonValue) {
+		try {
+			String value = jsonValue.getAsString().value();
+			resource.addProperty(property, value);
+		} catch (Exception e) {
+		}
+	}
+
+	private void setIntPropertyFromJson(Resource resource, Property property,
+			JsonValue jsonValue) {
+		try {
+			int value = jsonValue.getAsNumber().value().intValue();
+
+			Model model = resource.getModel();
+			Literal literal = model.createTypedLiteral(value);
+			resource.addProperty(property, literal);
+		} catch (Exception e) {
+		}
+	}
+
+	private void setResourcePropertyFromJson(Resource resource,
+			Property property, JsonValue jsonValue) {
+		try {
+			String value = jsonValue.getAsString().value();
+
+			Model model = resource.getModel();
+			Resource valueResource = model.createResource(value);
+			resource.addProperty(property, valueResource);
+		} catch (Exception e) {
+		}
+	}
+
+	@Override
+	public String getServiceLink(String endpointUri) {
+		String rId = getEndpointId(endpointUri);
+		String pId = getPackageId(endpointUri);
+		try {
+			URL url = new URL(DATASET_BASE + pId);
+			URLConnection conn = url.openConnection();
+			InputStream inputstream = conn.getInputStream();
+
+			JsonObject datasetObject = JSON.parse(inputstream);
+			String ckanUrl = datasetObject.get("ckan_url").getAsString().value();
+			
+			return ckanUrl + "/resource/" + rId;
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	@Override
+	public String getServiceUri() {
+		return "http://datahub.io/";
+	}
+
+	@Override
+	public boolean isAvailable() {
+		try {
+			URL url = new URL(API_BASE);
+			URLConnection conn = url.openConnection();
+			InputStream inputstream = conn.getInputStream();
+
+			JsonObject versionObject = JSON.parse(inputstream);
+			int version = versionObject.get("version").getAsNumber().value()
+					.intValue();
+			if (version == 2) {
+				return true;
+			} else {
+				return false;
+			}
+		} catch (Exception e) {
+			return false;
+		}
 	}
 }

@@ -1,14 +1,17 @@
 package org.deri.hcls.metex;
 
-import ie.deri.hcls.BlankNodeException;
-import ie.deri.hcls.Endpoint;
-import ie.deri.hcls.QueryExecutionException;
-
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.Collection;
 import java.util.HashSet;
 
 import org.apache.jena.atlas.web.HttpException;
+import org.deri.hcls.BlankNodeException;
+import org.deri.hcls.Endpoint;
+import org.deri.hcls.QueryExecutionException;
+import org.deri.hcls.vocabulary.VOID;
+import org.deri.hcls.vocabulary.VOIDX;
 
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
@@ -16,34 +19,43 @@ import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
+import com.hp.hpl.jena.rdf.model.ResIterator;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.sparql.engine.http.QueryExceptionHTTP;
+import com.hp.hpl.jena.vocabulary.RDF;
 
-public class VoidStoreAdapter implements WebServiceAdapter {
+public class VoidStoreAdapter implements ExtractorServiceAdapter,
+		EndpointListProviderAdapter {
 
-	private static final String voidStoreEndpointUri = "http://void.rkbexplorer.com/sparql/";
+	private static final String ENDPOINT_URI = "http://void.rkbexplorer.com/sparql/";
 
 	private Endpoint voidStoreEndpoint;
-	private Model model;
 
 	public VoidStoreAdapter() {
-		model = ModelFactory.createDefaultModel();
-		voidStoreEndpoint = new Endpoint(voidStoreEndpointUri, model);
+		Model model = ModelFactory.createDefaultModel();
+		voidStoreEndpoint = new Endpoint(ENDPOINT_URI, model);
+	}
+
+	@Override
+	public Model getMetadata(Endpoint endpoint, Collection<String> properties)
+			throws IOException {
+		return getMetadata(endpoint.getUri(), properties);
 	}
 
 	@Override
 	public Model getMetadata(Endpoint endpoint) throws IOException {
-		return getMetadata(endpoint.getUri());
+		return getMetadata(endpoint, null);
 	}
 
 	@Override
-	public Model getMetadata(String endpointUri) throws IOException {
+	public Model getMetadata(String endpointUri, Collection<String> properties)
+			throws IOException {
 		Model model = ModelFactory.createDefaultModel();
 		try {
 			Resource endpointDescription = voidStoreEndpoint.getResource(model
 					.createResource(endpointUri));
 			model.add(endpointDescription.listProperties());
-			model = getDatasets(endpointUri, model);
+			model.add(getDatasets(endpointUri, properties));
 		} catch (HttpException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -58,20 +70,29 @@ public class VoidStoreAdapter implements WebServiceAdapter {
 	}
 
 	@Override
-	public String getTitle(String endpoint) {
-		// TODO Auto-generated method stub
-		return null;
+	public Model getMetadata(String endpoint) throws IOException {
+		return getMetadata(endpoint, null);
 	}
 
 	@Override
 	public Collection<String> getAllEndpoints() throws IOException {
+		return getSomeEndpoints(0);
+	}
+
+	@Override
+	public Collection<String> getSomeEndpoints(int limit) throws IOException {
+
+		String limitString = "";
+		if (limit > 0) {
+			limitString = "limit " + limit;
+		}
 
 		String queryDs = "";
 		queryDs += "prefix sd: <http://www.w3.org/ns/sparql-service-description#> ";
 		queryDs += "prefix void: <http://rdfs.org/ns/void#> ";
 		queryDs += "select distinct ?endpoint { ";
 		queryDs += "	?ds void:sparqlEndpoint ?endpoint ";
-		queryDs += "} limit 10 ";
+		queryDs += "} " + limitString;
 		// TODO remove limit
 
 		String queryService = "";
@@ -112,7 +133,10 @@ public class VoidStoreAdapter implements WebServiceAdapter {
 		return endpoints;
 	}
 
-	private Model getDatasets(String endpointUri, Model model) {
+	private Model getDatasets(String endpointUri, Collection<String> properties) {
+
+		Model model = ModelFactory.createDefaultModel();
+		Resource endpointResource = model.createResource(endpointUri);
 
 		String query = "";
 		query += "prefix sd: <http://www.w3.org/ns/sparql-service-description#> ";
@@ -130,10 +154,17 @@ public class VoidStoreAdapter implements WebServiceAdapter {
 			while (results.hasNext()) {
 				QuerySolution solution = results.next();
 				Resource ds = solution.get("ds").asResource();
-				Property p = model.createProperty(solution.get("p")
-						.asResource().getURI());
-				RDFNode o = solution.get("o");
-				model.add(ds, p, o);
+				String predicateUri = solution.get("p").asResource().getURI();
+				if (properties != null && properties.contains(predicateUri)) {
+					if (org.deri.hcls.metex.Endpoint.termSubstitutions
+							.containsKey(predicateUri)) {
+						predicateUri = org.deri.hcls.metex.Endpoint.termSubstitutions
+								.get(predicateUri);
+					}
+					Property p = model.createProperty(predicateUri);
+					RDFNode o = solution.get("o");
+					model.add(ds, p, o);
+				}
 			}
 		} catch (QueryExceptionHTTP e) {
 			// TODO Auto-generated catch block
@@ -143,6 +174,39 @@ public class VoidStoreAdapter implements WebServiceAdapter {
 			e.printStackTrace();
 		}
 
+		ResIterator datasets = model.listResourcesWithProperty(
+				VOID.sparqlEndpoint, endpointResource);
+		while (datasets.hasNext()) {
+			Resource dataset = datasets.next();
+			dataset.addProperty(RDF.type, VOID.Dataset);
+			endpointResource.addProperty(VOIDX.providesAccessTo, dataset);
+		}
+
 		return model;
+	}
+
+	@Override
+	public String getServiceLink(String endpointUri) {
+		try {
+			return "http://void.rkbexplorer.com/browse/?uri="
+					+ URLEncoder.encode(endpointUri, "utf-8");
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
+	@Override
+	public String getServiceUri() {
+		return "http://void.rkbexplorer.com/";
+	}
+
+	@Override
+	public boolean isAvailable() {
+		try {
+			return voidStoreEndpoint.isAvailable();
+		} catch (Exception e) {
+			return false;
+		}
 	}
 }

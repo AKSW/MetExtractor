@@ -1,7 +1,6 @@
 package org.deri.hcls.metex;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,12 +37,6 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 	}
 
 	@Override
-	public Model getMetadata(Endpoint endpoint, Collection<String> properties)
-			throws IOException {
-		return getMetadata(endpoint);
-	}
-
-	@Override
 	public Model getMetadata(Endpoint endpoint) throws IOException {
 		return getMetadata(endpoint.getUri());
 	}
@@ -55,13 +48,7 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 		} catch (Exception e) {
 			throw new IOException(e);
 		}
-		return model;
-	}
-
-	@Override
-	public Model getMetadata(String endpoint, Collection<String> properties)
-			throws IOException {
-		return getMetadata(endpoint);
+		return null;
 	}
 
 	public void getSindiceSummary(String endpointUri) throws Exception {

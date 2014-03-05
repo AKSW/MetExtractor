@@ -37,9 +37,15 @@ public class DescriberAndExtractor {
 		DescriberAndExtractor describerAndExtractor = new DescriberAndExtractor();
 
 		if (args.length > 0) {
+			/*
+			 * configure a single endpoint
+			 */
 			String endpointUri = args[0];
 			describerAndExtractor.addEndpoint(endpointUri);
 		} else {
+			/*
+			 * Fetch a list of endpoints
+			 */
 			describerAndExtractor.fetchListOfEndpoints();
 		}
 		describerAndExtractor.run();
@@ -49,8 +55,7 @@ public class DescriberAndExtractor {
 		/*
 		 * create a persistent model so we can store it for further requests
 		 */
-		model = VirtModel.openDatabaseModel(
-				"http://metex.hcls.deri.org/",
+		model = VirtModel.openDatabaseModel("http://metex.hcls.deri.org/",
 				"jdbc:virtuoso://localhost:1111", "dba", "dba");
 	}
 
@@ -71,13 +76,12 @@ public class DescriberAndExtractor {
 	public void fetchListOfEndpoints() {
 		Collection<EndpointListProviderAdapter> services = new ArrayList<EndpointListProviderAdapter>();
 		services.add(new DatahubAdapter());
-		services.add(new VoidStoreAdapter());
+		services.add(new VoidStoreAdapter(Endpoint.datasetFetchProperties));
 
 		for (EndpointListProviderAdapter adapter : services) {
 
 			try {
-				Collection<String> adapterEndpoints = adapter
-						.getAllEndpoints();
+				Collection<String> adapterEndpoints = adapter.getAllEndpoints();
 				addAllEndpoints(adapterEndpoints);
 
 				System.out.println("We got " + adapterEndpoints.size()
@@ -90,11 +94,6 @@ public class DescriberAndExtractor {
 	}
 
 	public void run() {
-
-		/*
-		 * TODO provide a mechanism to also handle single endpoints
-		 */
-
 		/*
 		 * TODO see if we can run this in multiple threads
 		 */
@@ -156,13 +155,12 @@ public class DescriberAndExtractor {
 				available);
 
 		if (available) {
-			
+
 			/*
 			 * get metadata from endpoint for describing the endpoint and its
 			 * datasets
 			 */
 			Model endpointMetadata = endpoint.getMetadata();
-			Model extractedMetadata = endpoint.extractMetadata();
 
 			if (writeToVirtuoso(endpointMetadata, endpointResource)) {
 				System.err.println("Writng LD for " + endpoint.getUri()
@@ -172,132 +170,69 @@ public class DescriberAndExtractor {
 						+ endpoint.getUri());
 			}
 
-			if (writeToVirtuoso(extractedMetadata, endpointResource)) {
-				System.err.println("Writng extracted metadata for "
-						+ endpoint.getUri() + " … done");
-			} else {
-				System.err
-						.println("No extracted metadata was found for endpoint "
-								+ endpoint.getUri());
-			}
-
 			/*
 			 * if still metadata is missing, try to request it from external
 			 * services
 			 */
 
+			Collection<ExtractorServiceAdapter> services = new ArrayList<ExtractorServiceAdapter>();
+			services.add(getAdapter("datahub"));
+			services.add(getAdapter("voidstore"));
+			services.add(getAdapter("lodstats"));
+			services.add(getAdapter("sindice"));
+			services.add(getAdapter("manualextractor"));
 
-			System.err.println("Start to get datahub metadata …");
-			ExtractorServiceAdapter datahubAdapter = getAdapter("datahub");
-			try {
+			int i = 0;
+			int num = services.size();
+			String serviceName, retMessage;
+			int success;
+			System.err.println("Will get data from " + num + " services");
+			for (ExtractorServiceAdapter service : services) {
+				i++;
+				serviceName = service.getClass().getName();
 
-				System.err.println("try get metadata …");
-				Model metadata = datahubAdapter.getMetadata(endpoint.getUri());
-				System.err.println("ready get metadata …");
-				System.err.println("write metadata …");
+				System.err.print(i + "/" + num + " (" + serviceName + "): ");
 
-				if (writeToVirtuoso(metadata, endpointResource)) {
-					System.err.println("Writng datahub metadata for "
-							+ endpoint.getUri() + " … done");
-					statusResource.addProperty(VOIDX.availableAt,
-							datahubAdapter.getServiceUri());
-				} else {
-					System.err
-							.println("No datahub metadata was found for endpoint "
-									+ endpoint.getUri());
-					statusResource.addProperty(VOIDX.unavailableAt,
-							datahubAdapter.getServiceUri());
+				if (!service.isAvailable()) {
+					System.err.println(" … unavailable.");
+					continue;
 				}
-			} catch (IOException e) {
-				System.err
-						.println("Couldn't get datahub metadata for endpoint: "
-								+ endpoint.getUri());
-				e.printStackTrace();
-				statusResource.addProperty(VOIDX.unavailableAt,
-						datahubAdapter.getServiceUri());
-			}
 
-			System.err.println("Start to get voidstore metadata …");
-			ExtractorServiceAdapter voidstoreAdapter = getAdapter("voidstore");
-			
-			try {
-				Model metadata = voidstoreAdapter
-						.getMetadata(endpoint.getUri(), Endpoint.datasetFetchProperties);
+				success = -1;
+				System.err.println("start getting metadata.");
 
-				if (writeToVirtuoso(metadata, endpointResource)) {
-					System.err.println("Writng voidstore metadata for "
-							+ endpoint.getUri() + " … done");
-					statusResource.addProperty(VOIDX.availableAt,
-							voidstoreAdapter.getServiceUri());
-				} else {
-					System.err
-							.println("No voidstore metadata was found for endpoint "
-									+ endpoint.getUri());
-					statusResource.addProperty(VOIDX.unavailableAt,
-							voidstoreAdapter.getServiceUri());
+				try {
+					Model metadata = service.getMetadata(endpoint.getUri());
+					if (metadata != null) {
+						if (writeToVirtuoso(metadata, endpointResource)) {
+							success = 1;
+						}
+					} else {
+						success = 0;
+					}
+				} catch (IOException e) {
+					System.err.println("Couldn't get metadata for endpoint: "
+							+ endpoint.getUri());
+					e.printStackTrace();
+					success = -2;
 				}
-			} catch (IOException e) {
-				System.err
-						.println("Couldn't get voidstore metadata for endpoint: "
-								+ endpoint.getUri());
-				e.printStackTrace();
-				statusResource.addProperty(VOIDX.unavailableAt,
-						voidstoreAdapter.getServiceUri());
-			}
 
-			System.err.println("Start to get lodstats metadata …");
-			ExtractorServiceAdapter lodstatsAdapter = getAdapter("lodstats");
-			try {
-				Model metadata = lodstatsAdapter.getMetadata(endpoint.getUri());
-
-				if (writeToVirtuoso(metadata, endpointResource)) {
-					System.err.println("Writng lodstats metadata for "
-							+ endpoint.getUri() + " … done");
+				if (success > 0) {
 					statusResource.addProperty(VOIDX.availableAt,
-							lodstatsAdapter.getServiceUri());
-				} else {
-					System.err
-							.println("No lodstats metadata was found for endpoint "
-									+ endpoint.getUri());
+							service.getServiceUri());
+					retMessage = "successful";
+				} else if (success < 0) {
 					statusResource.addProperty(VOIDX.unavailableAt,
-							lodstatsAdapter.getServiceUri());
+							service.getServiceUri());
+					retMessage = "failed";
+				} else {
+					retMessage = "done";
 				}
-			} catch (IOException e) {
-				System.err
-						.println("Couldn't get lodstats metadata for endpoint: "
-								+ endpoint.getUri());
-				e.printStackTrace();
-				statusResource.addProperty(VOIDX.unavailableAt,
-						lodstatsAdapter.getServiceUri());
+
+				System.err.println("Getting and writng metadata from "
+						+ serviceName + " for " + endpoint.getUri() + " … "
+						+ retMessage);
 			}
-
-			System.err.println("Start to get sindice summary …");
-			ExtractorServiceAdapter sindiceAdapter = getAdapter("sindice");
-			try {
-				sindiceAdapter.getMetadata(endpoint.getUri());
-			} catch (IOException e) {
-				System.err
-						.println("Couldn't get sindice summary for endpoint: "
-								+ endpoint.getUri());
-			}
-
-			/*
-			 * if still metadata is missing, try to extract metadata by running
-			 * a bunch of queries
-			 */
-
-			System.err
-					.println("Start to manually extract the missing statistics …");
-			ExtractorServiceAdapter manualExtractor = getAdapter("manualextractor");
-			try {
-				manualExtractor.getMetadata(endpoint,
-						Endpoint.endpointProperties);
-			} catch (IOException e) {
-				System.err.println("Couldn't extract data for endpoint: "
-						+ endpoint.getUri());
-				e.printStackTrace();
-			}
-
 		} else {
 			System.err.println("Not available");
 		}
@@ -312,11 +247,11 @@ public class DescriberAndExtractor {
 			} else if (adapterName.toLowerCase().equals("datahub")) {
 				adapter = new DatahubAdapter();
 			} else if (adapterName.toLowerCase().equals("voidstore")) {
-				adapter = new VoidStoreAdapter();
+				adapter = new VoidStoreAdapter(Endpoint.datasetFetchProperties);
 			} else if (adapterName.toLowerCase().equals("lodstats")) {
 				adapter = new LODStatsAdapter();
 			} else if (adapterName.toLowerCase().equals("manualextractor")) {
-				adapter = new ManualExtractorAdapter(model);
+				adapter = new ManualExtractorAdapter(model, Endpoint.endpointProperties);
 			} else {
 				adapter = null;
 			}
@@ -343,7 +278,10 @@ public class DescriberAndExtractor {
 				while (statements.hasNext()) {
 					try {
 						Statement stmt = statements.next();
-						System.err.println("next: " + stmt.getSubject().getURI() + " " + stmt.getPredicate().getURI() + " " + stmt.getObject().toString());
+						System.err.println("next: "
+								+ stmt.getSubject().getURI() + " "
+								+ stmt.getPredicate().getURI() + " "
+								+ stmt.getObject().toString());
 						this.model.add(stmt);
 					} catch (AddDeniedException ee) {
 						endpointResource.addLiteral(RDFS.comment,

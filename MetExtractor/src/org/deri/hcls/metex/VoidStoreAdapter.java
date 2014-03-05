@@ -30,32 +30,27 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 	private static final String ENDPOINT_URI = "http://void.rkbexplorer.com/sparql/";
 
 	private Endpoint voidStoreEndpoint;
+	private Collection<String> datasetProperties;
 
-	public VoidStoreAdapter() {
+	public VoidStoreAdapter(Collection<String> properties) {
 		Model model = ModelFactory.createDefaultModel();
 		voidStoreEndpoint = new Endpoint(ENDPOINT_URI, model);
-	}
-
-	@Override
-	public Model getMetadata(Endpoint endpoint, Collection<String> properties)
-			throws IOException {
-		return getMetadata(endpoint.getUri(), properties);
+		datasetProperties = properties;
 	}
 
 	@Override
 	public Model getMetadata(Endpoint endpoint) throws IOException {
-		return getMetadata(endpoint, null);
+		return getMetadata(endpoint.getUri());
 	}
 
 	@Override
-	public Model getMetadata(String endpointUri, Collection<String> properties)
-			throws IOException {
+	public Model getMetadata(String endpointUri) throws IOException {
 		Model model = ModelFactory.createDefaultModel();
 		try {
 			Resource endpointDescription = voidStoreEndpoint.getResource(model
 					.createResource(endpointUri));
 			model.add(endpointDescription.listProperties());
-			model.add(getDatasets(endpointUri, properties));
+			model.add(getDatasets(endpointUri, datasetProperties));
 		} catch (HttpException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -67,11 +62,6 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 			e.printStackTrace();
 		}
 		return model;
-	}
-
-	@Override
-	public Model getMetadata(String endpoint) throws IOException {
-		return getMetadata(endpoint, null);
 	}
 
 	@Override

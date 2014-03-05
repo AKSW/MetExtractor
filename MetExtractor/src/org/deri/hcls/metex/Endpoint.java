@@ -280,6 +280,8 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 			model.add(properties);
 		}
 
+		model.add(getDatasetMetadata());
+		
 		return model;
 	}
 
@@ -308,7 +310,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 		return resourceOutput;
 	}
 
-	public Model extractMetadata() {
+	public Model getDatasetMetadata() {
 
 		Model model = ModelFactory.createDefaultModel();
 		try {

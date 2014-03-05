@@ -34,30 +34,21 @@ import com.hp.hpl.jena.rdf.model.Resource;
 public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 
 	private Model model;
+	private Collection<String> targetProperties;
 
-	public ManualExtractorAdapter(Model model) {
+	public ManualExtractorAdapter(Model model, Collection<String> properties) {
 		this.model = model;
+		targetProperties = properties;
 	}
 
 	@Override
-	public Model getMetadata(String endpointUri) throws IOException {
-		return getMetadata(endpointUri, null);
+	public Model getMetadata(String endpointUri)
+			throws IOException {
+		return getMetadata(new Endpoint(endpointUri, model));
 	}
 
 	@Override
 	public Model getMetadata(Endpoint endpoint) throws IOException {
-		return getMetadata(endpoint, null);
-	}
-
-	@Override
-	public Model getMetadata(String endpointUri, Collection<String> properties)
-			throws IOException {
-		return getMetadata(new Endpoint(endpointUri, model), properties);
-	}
-
-	@Override
-	public Model getMetadata(Endpoint endpoint,
-			Collection<String> targetProperties) throws IOException {
 		Resource endpointResource = model.createResource(endpoint.getUri());
 		Collection<String> missingProperties = getListOfMissingProperties(
 				endpointResource, targetProperties);

@@ -49,12 +49,6 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 	}
 
 	@Override
-	public Model getMetadata(Endpoint endpoint, Collection<String> properties)
-			throws IOException {
-		return getMetadata(endpoint);
-	}
-
-	@Override
 	public Model getMetadata(String endpointUri) throws IOException {
 		String endpointId = getPackageId(endpointUri);
 		URL url = new URL(DATASET_BASE + endpointId);
@@ -96,12 +90,6 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 		 */
 
 		return model;
-	}
-
-	@Override
-	public Model getMetadata(String endpoint, Collection<String> properties)
-			throws IOException {
-		return getMetadata(endpoint);
 	}
 
 	@Override
@@ -180,10 +168,10 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 	}
 
 	private String getPackageId(String uri) {
-		if (endpointIds.isEmpty()) {
+		if (packageIds.isEmpty()) {
 			getIds(uri);
 		}
-		return endpointIds.get(uri);
+		return packageIds.get(uri);
 	}
 
 	private void getIds(String uri) {
@@ -315,8 +303,9 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 			InputStream inputstream = conn.getInputStream();
 
 			JsonObject datasetObject = JSON.parse(inputstream);
-			String ckanUrl = datasetObject.get("ckan_url").getAsString().value();
-			
+			String ckanUrl = datasetObject.get("ckan_url").getAsString()
+					.value();
+
 			return ckanUrl + "/resource/" + rId;
 		} catch (IOException e) {
 			return null;

@@ -1,7 +1,6 @@
 package org.deri.hcls.metex;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,13 +53,7 @@ public class LODStatsAdapter implements ExtractorServiceAdapter {
 	}
 
 	@Override
-	public Model getMetadata(String endpoint) throws IOException {
-		return getMetadata(endpoint, null);
-	}
-
-	@Override
-	public Model getMetadata(String endpointUri, Collection<String> properties)
-			throws IOException {
+	public Model getMetadata(String endpointUri) throws IOException {
 		Model model = ModelFactory.createDefaultModel();
 		Resource endpointResource = model.createResource(endpointUri);
 		String query = String.format(templateQuery, endpointUri);
@@ -89,13 +82,7 @@ public class LODStatsAdapter implements ExtractorServiceAdapter {
 
 	@Override
 	public Model getMetadata(Endpoint endpoint) throws IOException {
-		return getMetadata(endpoint.getUri(), null);
-	}
-
-	@Override
-	public Model getMetadata(Endpoint endpoint, Collection<String> properties)
-			throws IOException {
-		return getMetadata(endpoint.getUri(), properties);
+		return getMetadata(endpoint.getUri());
 	}
 
 	@Override

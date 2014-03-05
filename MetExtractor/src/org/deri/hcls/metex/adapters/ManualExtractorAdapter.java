@@ -1,4 +1,4 @@
-package org.deri.hcls.metex;
+package org.deri.hcls.metex.adapters;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -8,6 +8,7 @@ import java.util.Set;
 import org.apache.jena.atlas.web.HttpException;
 import org.deri.hcls.Endpoint;
 import org.deri.hcls.QueryExecutionException;
+import org.deri.hcls.metex.ExtractorServiceAdapter;
 import org.deri.hcls.vocabulary.VOID;
 import org.deri.hcls.vocabulary.VOIDX;
 import org.deri.hcls.vocabulary.Vocabularies;

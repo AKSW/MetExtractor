@@ -1,4 +1,4 @@
-package org.deri.hcls.metex;
+package org.deri.hcls.metex.adapters;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,6 +14,8 @@ import org.apache.jena.atlas.json.JSON;
 import org.apache.jena.atlas.json.JsonObject;
 import org.apache.jena.atlas.json.JsonValue;
 import org.deri.hcls.Endpoint;
+import org.deri.hcls.metex.EndpointListProviderAdapter;
+import org.deri.hcls.metex.ExtractorServiceAdapter;
 import org.deri.hcls.vocabulary.VOID;
 import org.deri.hcls.vocabulary.Vocabularies;
 

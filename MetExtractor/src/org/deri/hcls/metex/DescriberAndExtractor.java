@@ -11,6 +11,11 @@ import java.util.Set;
 import org.apache.jena.riot.RiotException;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.ResourceHelper;
+import org.deri.hcls.metex.adapters.DatahubAdapter;
+import org.deri.hcls.metex.adapters.LODStatsAdapter;
+import org.deri.hcls.metex.adapters.ManualExtractorAdapter;
+import org.deri.hcls.metex.adapters.SindiceAdapter;
+import org.deri.hcls.metex.adapters.VoidStoreAdapter;
 import org.deri.hcls.vocabulary.VOIDX;
 import org.deri.hcls.vocabulary.Vocabularies;
 

@@ -2,8 +2,6 @@ package org.deri.hcls.metex.adapters;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.apache.jena.atlas.web.HttpException;
 import org.deri.hcls.Endpoint;
@@ -11,14 +9,12 @@ import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.metex.ExtractorServiceAdapter;
 import org.deri.hcls.vocabulary.VOID;
 import org.deri.hcls.vocabulary.VOIDX;
-import org.deri.hcls.vocabulary.Vocabularies;
 
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.rdf.model.Literal;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
-import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.Resource;
 
 /**
@@ -34,38 +30,35 @@ import com.hp.hpl.jena.rdf.model.Resource;
  */
 public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 
-	private Model model;
 	private Collection<String> targetProperties;
 
-	public ManualExtractorAdapter(Model model, Collection<String> properties) {
-		this.model = model;
+	public ManualExtractorAdapter(Collection<String> properties) {
 		targetProperties = properties;
 	}
 
 	@Override
-	public Model getMetadata(String endpointUri)
-			throws IOException {
+	public Model getMetadata(String endpointUri) throws IOException {
+		Model model = ModelFactory.createDefaultModel();
 		return getMetadata(new Endpoint(endpointUri, model));
 	}
 
 	@Override
 	public Model getMetadata(Endpoint endpoint) throws IOException {
+		Model model = ModelFactory.createDefaultModel();
 		Resource endpointResource = model.createResource(endpoint.getUri());
-		Collection<String> missingProperties = getListOfMissingProperties(
-				endpointResource, targetProperties);
 
-		if (missingProperties == null) {
+		if (targetProperties == null) {
 			// TODO somehow execute all queries
 			// for now throw an Exception
 			throw new IOException("no targetProperties specified");
 		} else {
 			System.err.println("Missing Properties are:");
-			for(String prop : missingProperties) {
+			for (String prop : targetProperties) {
 				System.err.println(prop);
 			}
 		}
 
-		for (String property : missingProperties) {
+		for (String property : targetProperties) {
 			try {
 				if (property.equals(VOID.triples.getURI())) {
 					Literal countLiteral = getTripleCount(endpoint);
@@ -99,16 +92,12 @@ public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 							countLiteral);
 
 				} else if (property.equals(VOIDX.namespaceCount.getURI())) {
-					// TODO
-					int namespaceCount = 0;
-					Literal countLiteral = model
-							.createTypedLiteral(namespaceCount);
-					endpointResource.addProperty(VOIDX.namespaceCount,
-							countLiteral);
-
-				} else if (property.equals(Vocabularies.SD_endpoint.getURI())) {
-					endpointResource.addProperty(Vocabularies.SD_endpoint,
-							endpointResource);
+					/*
+					 * TODO int namespaceCount = 0; Literal countLiteral = model
+					 * .createTypedLiteral(namespaceCount);
+					 * endpointResource.addProperty(VOIDX.namespaceCount,
+					 * countLiteral);
+					 */
 				}
 			} catch (QueryExecutionException e) {
 				System.err.println("Manual extraction of value for " + property
@@ -116,26 +105,7 @@ public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 			}
 		}
 
-		model.commit();
-
-		return null;
-	}
-
-	private Collection<String> getListOfMissingProperties(Resource resource,
-			Collection<String> targetProperties) {
-		if (targetProperties == null) {
-			return null;
-		}
-
-		Model model = ModelFactory.createDefaultModel();
-		Set<String> missingProperties = new HashSet<String>();
-		for (String predicateUri : targetProperties) {
-			Property property = model.createProperty(predicateUri);
-			if (!resource.hasProperty(property)) {
-				missingProperties.add(predicateUri);
-			}
-		}
-		return missingProperties;
+		return model;
 	}
 
 	private Literal getTripleCount(Endpoint endpoint)
@@ -189,6 +159,7 @@ public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 	private Literal executeCountQuery(String query, Endpoint endpoint)
 			throws QueryExecutionException {
 		try {
+			Model model = ModelFactory.createDefaultModel();
 			ResultSet results = endpoint.execSelect(query);
 
 			if (results.hasNext()) {

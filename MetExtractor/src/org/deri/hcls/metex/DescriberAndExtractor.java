@@ -257,7 +257,7 @@ public class DescriberAndExtractor {
 			} else if (adapterName.toLowerCase().equals("lodstats")) {
 				adapter = new LODStatsAdapter();
 			} else if (adapterName.toLowerCase().equals("manualextractor")) {
-				adapter = new ManualExtractorAdapter(model,
+				adapter = new ManualExtractorAdapter(
 						Endpoint.endpointProperties);
 			} else {
 				adapter = null;

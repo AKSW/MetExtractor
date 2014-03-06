@@ -20,6 +20,7 @@ import com.hp.hpl.jena.query.QueryParseException;
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.rdf.model.Model;
+import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.sparql.engine.http.QueryExceptionHTTP;
 import com.hp.hpl.jena.sparql.resultset.ResultSetException;
@@ -31,10 +32,13 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 
 	private Map<String, String> predicateStructures = new HashMap<String, String>();
 
-	private Model model;
-
+	/**
+	 * represents the global instance of the model. This should only be accessed for reading.
+	 */
+	private Model globalModel;
+	
 	public SindiceAdapter(Model model) {
-		this.model = model;
+		this.globalModel = model;
 	}
 
 	@Override
@@ -45,17 +49,17 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 	@Override
 	public Model getMetadata(String endpoint) throws IOException {
 		try {
-			getSindiceSummary(endpoint);
+			return getSindiceSummary(endpoint);
 		} catch (Exception e) {
 			throw new IOException(e);
 		}
-		return null;
 	}
 
-	public void getSindiceSummary(String endpointUri) throws Exception {
+	public Model getSindiceSummary(String endpointUri) throws Exception {
 
+		Model model = ModelFactory.createDefaultModel();
+		
 		Resource endpointResource = model.createResource(endpointUri);
-		// Model model = ModelFactory.createDefaultModel();
 		HTTPSimpleQuery hsq = new HTTPSimpleQuery(endpointUri);
 
 		try {
@@ -75,8 +79,7 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 					continue;
 				}
 
-				String domainStructureUri = getDomainStructure(model,
-						endpointUri, domainResource.getURI());
+				String domainStructureUri = getDomainStructure(endpointUri, domainResource.getURI());
 				String predicateStructureUri = null;
 				Resource domainStructureResource;
 				Resource predicateStructureResource;
@@ -90,8 +93,7 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 				} else {
 					domainStructureResource = model
 							.createResource(domainStructureUri);
-					predicateStructureUri = getPredicateStructure(model,
-							domainStructureUri, predicateResource.getURI());
+					predicateStructureUri = getPredicateStructure(domainStructureUri, predicateResource.getURI());
 				}
 
 				if (predicateStructureUri == null) {
@@ -113,9 +115,18 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 			hsq.stopConnexion();
 
 		}
+		
+		return model;
 	}
 
-	private String getDomainStructure(Model model, String endpointUri,
+	/**
+	 * Get a structure node, which describes the given domain
+	 * @param endpointUri
+	 * @param domainUri
+	 * @return
+	 * @throws QueryExecutionException
+	 */
+	private String getDomainStructure(String endpointUri,
 			String domainUri) throws QueryExecutionException {
 		if (domainStructures.containsKey(domainUri)) {
 			return domainStructures.get(domainUri);
@@ -127,7 +138,7 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 			query += "	?structure voidx:domain <" + domainUri + "> . ";
 			query += "}";
 
-			String domainStructureUri = execStructureQuery(model, query);
+			String domainStructureUri = execStructureQuery(query);
 			if (domainStructureUri != null) {
 				domainStructures.put(domainUri, domainStructureUri);
 			}
@@ -136,8 +147,14 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 		}
 	}
 
-	private String getPredicateStructure(Model model,
-			String domainStructureUri, String predicateUri)
+	/**
+	 * Get a structure node, which describes the given predicate
+	 * @param domainStructureUri
+	 * @param predicateUri
+	 * @return
+	 * @throws QueryExecutionException
+	 */
+	private String getPredicateStructure(String domainStructureUri, String predicateUri)
 			throws QueryExecutionException {
 		if (predicateStructures.containsKey(predicateUri)) {
 			return predicateStructures.get(predicateUri);
@@ -150,7 +167,7 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 			query += "	?structure voidx:predicate <" + predicateUri + "> . ";
 			query += "}";
 
-			String predicateStructureUri = execStructureQuery(model, query);
+			String predicateStructureUri = execStructureQuery(query);
 			if (predicateStructureUri != null) {
 				predicateStructures.put(predicateUri, predicateStructureUri);
 			}
@@ -159,11 +176,18 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 		}
 	}
 
-	private String execStructureQuery(Model model, String query)
+	/**
+	 * Query the global model for already existing structure nodes.
+	 * 
+	 * @param query
+	 * @return
+	 * @throws QueryExecutionException
+	 */
+	private String execStructureQuery(String query)
 			throws QueryExecutionException {
 		try {
 			Query qr = QueryFactory.create(query);
-			QueryExecution x = QueryExecutionFactory.create(qr, model);
+			QueryExecution x = QueryExecutionFactory.create(qr, globalModel);
 
 			ResultSet results = x.execSelect();
 

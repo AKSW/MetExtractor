@@ -76,6 +76,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 		datasetProperties.add(VOID.exampleResource.getURI());
 		datasetProperties.add(VOID.uriRegexPattern.getURI());
 		datasetProperties.add(VOID.NS + "rootResource");
+		datasetProperties.add(DCTerms.subject.getURI());
 		datasetFetchProperties.add("http://bio2rdf.org/dcat:distribution");
 		datasetFetchProperties
 				.add("http://bio2rdf.org/dataset_vocabulary:has_triple_count");
@@ -89,6 +90,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 				.add("http://bio2rdf.org/dataset_vocabulary:has_unique_subject_count");
 		datasetFetchProperties
 				.add("http://bio2rdf.org/dataset_vocabulary:has_unique_object_count");
+		datasetFetchProperties.add(DC.subject.getURI());
 
 		datasetFetchProperties.addAll(datasetProperties);
 	}
@@ -111,7 +113,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 				.add("http://www.w3.org/ns/sparql-service-description#resultFormat");
 		endpointProperties
 				.add("http://www.w3.org/ns/sparql-service-description#supportedLanguage");
-		endpointProperties.add(Vocabularies.sd_endpoint.getURI());
+		endpointProperties.add(Vocabularies.SD_endpoint.getURI());
 		endpointProperties.add(VOID.triples.getURI());
 		endpointProperties.add(VOID.entities.getURI());
 		endpointProperties.add(VOID.classes.getURI());
@@ -121,6 +123,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 		endpointProperties.add(VOIDX.blankNodeCount.getURI());
 		endpointProperties.add(VOIDX.namespaceCount.getURI());
 		endpointProperties.add(VOIDX.datasetCount.getURI());
+		endpointProperties.add(DCTerms.subject.getURI());
 
 		endpointFetchProperties
 				.add("http://bio2rdf.org/dataset_vocabulary:has_url");
@@ -138,6 +141,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 				.add("http://bio2rdf.org/dataset_vocabulary:has_unique_object_count");
 		endpointFetchProperties
 				.add("http://bio2rdf.org/dataset_vocabulary:has_type_count");
+		endpointFetchProperties.add(DC.subject.getURI());
 
 		endpointFetchProperties.addAll(endpointProperties);
 	}
@@ -146,9 +150,9 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 	static {
 		termSubstitutions.put(
 				"http://www.w3.org/ns/sparql-service-description#url",
-				Vocabularies.sd_endpoint.getURI());
+				Vocabularies.SD_endpoint.getURI());
 		termSubstitutions.put("http://bio2rdf.org/dataset_vocabulary:has_url",
-				Vocabularies.sd_endpoint.getURI());
+				Vocabularies.SD_endpoint.getURI());
 		termSubstitutions.put(
 				"http://bio2rdf.org/dataset_vocabulary:has_triple_count",
 				VOID.triples.getURI());
@@ -172,6 +176,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 						VOID.distinctObjects.getURI());
 		termSubstitutions.put("http://bio2rdf.org/dcat:distribution",
 				"http://www.w3.org/ns/dcat#distribution");
+		termSubstitutions.put(DC.subject.getURI(), DCTerms.subject.getURI());
 	}
 
 	/**
@@ -281,7 +286,7 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 		}
 
 		model.add(getDatasetMetadata());
-		
+
 		return model;
 	}
 

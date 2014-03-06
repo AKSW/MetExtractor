@@ -4,16 +4,20 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.apache.jena.atlas.web.HttpException;
 import org.deri.hcls.BlankNodeException;
 import org.deri.hcls.Endpoint;
+import org.deri.hcls.LinkeddataHelper;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.metex.EndpointListProviderAdapter;
 import org.deri.hcls.metex.ExtractorServiceAdapter;
 import org.deri.hcls.vocabulary.VOID;
 import org.deri.hcls.vocabulary.VOIDX;
+import org.deri.hcls.vocabulary.Vocabularies;
 
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;
@@ -24,12 +28,40 @@ import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.ResIterator;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.sparql.engine.http.QueryExceptionHTTP;
+import com.hp.hpl.jena.vocabulary.DCTerms;
 import com.hp.hpl.jena.vocabulary.RDF;
 
 public class VoidStoreAdapter implements ExtractorServiceAdapter,
 		EndpointListProviderAdapter {
 
 	private static final String ENDPOINT_URI = "http://void.rkbexplorer.com/sparql/";
+	private static final String SCOVO_dimension = "http://purl.org/NET/scovo#dimension";
+
+	private static Map<String, String> dimensionToProperty = new HashMap<String, String>();
+	static {
+		dimensionToProperty.put(VOID.NS + "numberOfResources",
+				VOID.distinctSubjects.getURI());
+		dimensionToProperty.put(VOID.NS + "numberOfTriples",
+				VOID.triples.getURI());
+		dimensionToProperty
+				.put(VOID.NS + "numOfTriples", VOID.triples.getURI());
+	}
+
+	private static Map<String, String> mimeToFormat = new HashMap<String, String>();
+	static {
+		mimeToFormat.put("application/sparql-results+xml",
+				Vocabularies.FORMATS_SPARQL_Results_XML.getURI());
+		mimeToFormat.put("text/csv",
+				Vocabularies.FORMATS_SPARQL_Results_CSV.getURI());
+		mimeToFormat.put("application/sparql-results+json",
+				Vocabularies.FORMATS_SPARQL_Results_JSON.getURI());
+		mimeToFormat.put("text/turtle", Vocabularies.FORMATS_Turtle.getURI());
+		mimeToFormat.put("text/rdf+n3", Vocabularies.FORMATS_N3.getURI());
+		mimeToFormat.put("application/rdf+xml",
+				Vocabularies.FORMATS_RDF_XML.getURI());
+		mimeToFormat.put("application/n-triples",
+				Vocabularies.FORMATS_NTriples.getURI());
+	}
 
 	private Endpoint voidStoreEndpoint;
 	private Collection<String> datasetProperties;
@@ -85,7 +117,6 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 		queryDs += "select distinct ?endpoint { ";
 		queryDs += "	?ds void:sparqlEndpoint ?endpoint ";
 		queryDs += "} " + limitString;
-		// TODO remove limit
 
 		String queryService = "";
 		queryService += "prefix sd: <http://www.w3.org/ns/sparql-service-description#> ";
@@ -133,10 +164,14 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 		String query = "";
 		query += "prefix sd: <http://www.w3.org/ns/sparql-service-description#> ";
 		query += "prefix void: <http://rdfs.org/ns/void#> ";
-		query += "select distinct ?ds ?p ?o { ";
+		query += "prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ";
+		query += "select distinct ?ds ?p ?o ?io ?dim { ";
 		query += "	{ ";
 		query += "		?ds void:sparqlEndpoint <" + endpointUri + "> ; ";
 		query += "		    ?p ?o ";
+		query += "		optional { ";
+		query += "			?o rdf:value ?io ; <" + SCOVO_dimension + "> ?dim ";
+		query += "		} ";
 		query += "	} ";
 		query += "} ";
 
@@ -156,6 +191,62 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 					Property p = model.createProperty(predicateUri);
 					RDFNode o = solution.get("o");
 					model.add(ds, p, o);
+				} else if (predicateUri.equals(VOID.NS + "statItem")) {
+					/*
+					 * This is an endpoint specific property
+					 */
+					RDFNode dimensoion = solution.get("dim");
+					if (dimensoion.isURIResource()) {
+						predicateUri = dimensionToProperty.get(dimensoion
+								.asResource().getURI());
+						Property p = model.createProperty(predicateUri);
+						RDFNode o = solution.get("io");
+						model.add(ds, p, o);
+					}
+				} else if (predicateUri.equals(VOID.NS + "feature")) {
+					RDFNode o = solution.get("o");
+					if (!o.isURIResource()) {
+						continue;
+					}
+					if (o.asResource().getLocalName().equals("sparql")) {
+						Resource endpoint = model.createProperty(endpointUri);
+						model.add(endpoint, Vocabularies.SD_defaultDataset, ds);
+						try {
+							Collection<RDFNode> values = LinkeddataHelper
+									.getResourceValue(o.asResource(),
+											DCTerms.format);
+
+							for (RDFNode value : values) {
+								if (value.isLiteral()) {
+									String formatUri = mimeToFormat.get(value.asLiteral().getString());
+									Resource format = model.createProperty(formatUri);
+									
+									model.add(endpoint, Vocabularies.SD_resultFormat, format);
+								} else if (value.isURIResource()) {
+									model.add(endpoint, Vocabularies.SD_resultFormat, value);
+								}
+							}
+						} catch (Exception e) {
+						}
+					} else {
+						String featureUri = o.asResource().getURI();
+						if (o.asResource().getLocalName().equals("rdfxml")) {
+							featureUri = "http://www.w3.org/ns/formats/RDF_XML";
+						} else if (o.asResource().getLocalName()
+								.equals("N-Triples")) {
+							featureUri = "http://www.w3.org/ns/formats/N-Triples";
+						} else if (o.asResource().getLocalName()
+								.equals("Turtle_RDF")) {
+							featureUri = "http://www.w3.org/ns/formats/Turtle";
+						} else if (o.asResource().getLocalName()
+								.equals("RDF_JSON")) {
+							featureUri = "http://www.w3.org/ns/formats/RDF_JSON";
+						}
+						Resource feature = model.createProperty(featureUri);
+
+						model.add(ds, VOID.feature, feature);
+					}
+
 				}
 			}
 		} catch (QueryExceptionHTTP e) {

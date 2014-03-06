@@ -51,7 +51,7 @@ public class DescriberAndExtractor {
 			/*
 			 * Fetch a list of endpoints
 			 */
-			describerAndExtractor.fetchListOfEndpoints();
+			describerAndExtractor.fetchListOfEndpoints(10);
 		}
 		describerAndExtractor.run();
 	}
@@ -75,15 +75,19 @@ public class DescriberAndExtractor {
 		}
 	}
 
-	public void fetchListOfEndpoints() {
+	public void fetchListOfEndpoints(int limit) {
 		Collection<EndpointListProviderAdapter> services = new ArrayList<EndpointListProviderAdapter>();
 		services.add(new DatahubAdapter());
 		services.add(new VoidStoreAdapter(Endpoint.datasetFetchProperties));
 
 		for (EndpointListProviderAdapter adapter : services) {
-
 			try {
-				Collection<String> adapterEndpoints = adapter.getAllEndpoints();
+				Collection<String> adapterEndpoints;
+				if (limit < 0) {
+					adapterEndpoints = adapter.getAllEndpoints();
+				} else {
+					adapterEndpoints = adapter.getSomeEndpoints(limit);
+				}
 				addAllEndpoints(adapterEndpoints);
 
 				System.out.println("We got " + adapterEndpoints.size()
@@ -113,7 +117,7 @@ public class DescriberAndExtractor {
 	private void runForEndpoint(Endpoint endpoint) {
 		Resource endpointResource = endpoint.getEndpointResource();
 
-		endpointResource.addProperty(RDF.type, Vocabularies.sd_Service);
+		endpointResource.addProperty(RDF.type, Vocabularies.SD_Service);
 
 		boolean available = false;
 
@@ -165,7 +169,7 @@ public class DescriberAndExtractor {
 			Model endpointMetadata = endpoint.getMetadata();
 
 			if (writeToVirtuoso(endpointMetadata, endpointResource)) {
-				System.err.println("Writng LD for " + endpoint.getUri()
+				System.err.println("Writing LD for " + endpoint.getUri()
 						+ " … done");
 			} else {
 				System.err.println("No LD metadata was found for endpoint "
@@ -228,10 +232,10 @@ public class DescriberAndExtractor {
 							service.getServiceUri());
 					retMessage = "failed";
 				} else {
-					retMessage = "done";
+					retMessage = "done or nothing available";
 				}
 
-				System.err.println("Getting and writng metadata from "
+				System.err.println("Getting and writing metadata from "
 						+ serviceName + " for " + endpoint.getUri() + " … "
 						+ retMessage);
 			}
@@ -253,7 +257,8 @@ public class DescriberAndExtractor {
 			} else if (adapterName.toLowerCase().equals("lodstats")) {
 				adapter = new LODStatsAdapter();
 			} else if (adapterName.toLowerCase().equals("manualextractor")) {
-				adapter = new ManualExtractorAdapter(model, Endpoint.endpointProperties);
+				adapter = new ManualExtractorAdapter(model,
+						Endpoint.endpointProperties);
 			} else {
 				adapter = null;
 			}

@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.jena.atlas.json.JSON;
+import org.apache.jena.atlas.json.JsonArray;
 import org.apache.jena.atlas.json.JsonObject;
 import org.apache.jena.atlas.json.JsonValue;
 import org.deri.hcls.Endpoint;
@@ -38,6 +39,7 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 	private static final String DATASET_BASE = API_BASE + "rest/dataset/";
 	private static final String RESOURCE_SEARCH_BASE = API_BASE
 			+ "search/resource";
+	private static final String TAG_PREFIX = "http://datahub.io/dataset?tags=";
 
 	private static Map<String, String> endpointIds = new HashMap<String, String>();
 	private static Map<String, String> packageIds = new HashMap<String, String>();
@@ -53,6 +55,13 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 	@Override
 	public Model getMetadata(String endpointUri) throws IOException {
 		String endpointId = getPackageId(endpointUri);
+		if (endpointId == null) {
+			/*
+			 * There is no data available at datahub for this endpoint
+			 */
+			return null;
+		}
+
 		URL url = new URL(DATASET_BASE + endpointId);
 		URLConnection conn = url.openConnection();
 		InputStream inputstream = conn.getInputStream();
@@ -77,7 +86,7 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 						Resource endpointResource = model
 								.createResource(endpointUri);
 						endpointResource
-								.addProperty(Vocabularies.sd_defaultDataset,
+								.addProperty(Vocabularies.SD_defaultDataset,
 										datasetResource);
 						datasetResource.addProperty(RDF.type, VOID.Dataset);
 						datasetResource.addProperty(VOID.sparqlEndpoint,
@@ -86,10 +95,6 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 				}
 			}
 		}
-
-		/*
-		 * TODO see how we can use the dataset level metadata
-		 */
 
 		return model;
 	}
@@ -241,22 +246,45 @@ public class DatahubAdapter implements ExtractorServiceAdapter,
 					extras.get("namespace"));
 
 			try {
-				String maintainer = jsonRoot.get("maintainer").getAsString()
-						.value();
-				String maintainer_email = jsonRoot.get("maintainer_email")
-						.getAsString().value();
-				String author = jsonRoot.get("author").getAsString().value();
-				String author_email = jsonRoot.get("author_email")
-						.getAsString().value();
+				String creatorString;
 
-				datasetResource.addProperty(DCTerms.creator, "\"" + author
-						+ "\" <" + author_email + ">");
+				if (jsonRoot.hasKey("author")
+						&& jsonRoot.hasKey("author_email")) {
+					String author = jsonRoot.get("author").getAsString()
+							.value();
+					String author_email = jsonRoot.get("author_email")
+							.getAsString().value();
+
+					creatorString = "\"" + author + "\" <" + author_email + ">";
+				} else if (jsonRoot.hasKey("author")
+						&& jsonRoot.hasKey("author_email")) {
+
+					String maintainer = jsonRoot.get("maintainer")
+							.getAsString().value();
+					String maintainer_email = jsonRoot.get("maintainer_email")
+							.getAsString().value();
+
+					creatorString = "\"" + maintainer + "\" <"
+							+ maintainer_email + ">";
+				} else {
+					// will be caught
+					creatorString = null;
+				}
+
+				datasetResource.addProperty(DCTerms.creator, creatorString);
 			} catch (Exception e) {
 			}
 
-			/*
-			 * TODO also extract tags for categories
-			 */
+			try {
+				JsonArray tags = jsonRoot.get("tags").getAsArray();
+				for (JsonValue tag : tags) {
+					String tagValue = tag.getAsString().value();
+					Resource tagResource = model.createResource(TAG_PREFIX
+							+ tagValue);
+					datasetResource.addProperty(DCTerms.subject, tagResource);
+				}
+			} catch (Exception e) {
+			}
 		}
 
 		return datasetResource;

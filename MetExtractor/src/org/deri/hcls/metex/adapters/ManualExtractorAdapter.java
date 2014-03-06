@@ -106,8 +106,8 @@ public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 					endpointResource.addProperty(VOIDX.namespaceCount,
 							countLiteral);
 
-				} else if (property.equals(Vocabularies.sd_endpoint.getURI())) {
-					endpointResource.addProperty(Vocabularies.sd_endpoint,
+				} else if (property.equals(Vocabularies.SD_endpoint.getURI())) {
+					endpointResource.addProperty(Vocabularies.SD_endpoint,
 							endpointResource);
 				}
 			} catch (QueryExecutionException e) {

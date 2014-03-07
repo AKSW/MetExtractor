@@ -26,9 +26,12 @@ public class LODStatsAdapter implements ExtractorServiceAdapter {
 	private static String templateQuery = "";
 	static {
 		templateQuery += "prefix qb: <http://stats.lod2.eu/rdf/qb/> ";
-		templateQuery += "select distinct  ?value ?criterion { ";
-		templateQuery += "  ?sds qb:sourceDataset <%s> ; qb:value ?value ; qb:statisticalCriterion ?criterion ";
-		templateQuery += "}";
+		templateQuery += "select distinct ?value ?criterion { ";
+		templateQuery += "  ?sds qb:sourceDataset <%s> ; ";
+		templateQuery += "  	 qb:value ?value ; ";
+		templateQuery += "  	 qb:statisticalCriterion ?criterion ; ";
+		templateQuery += "  	 qb:timeOfMeasure ?tom  ";
+		templateQuery += "} order by desc(?tom) ";
 	}
 
 	private static Map<String, Property> criteriaToVoid = new HashMap<String, Property>();
@@ -55,6 +58,8 @@ public class LODStatsAdapter implements ExtractorServiceAdapter {
 
 	@Override
 	public Model getMetadata(String endpointUri) throws IOException {
+		Map<String, Property> criteriaToVoid = new HashMap<String, Property>(
+				LODStatsAdapter.criteriaToVoid);
 		Model model = ModelFactory.createDefaultModel();
 		Resource endpointResource = model.createResource(endpointUri);
 		String query = String.format(templateQuery, endpointUri);
@@ -67,6 +72,7 @@ public class LODStatsAdapter implements ExtractorServiceAdapter {
 				String criterion = solution.get("criterion").asResource()
 						.getURI();
 				Property property = criteriaToVoid.get(criterion);
+				criteriaToVoid.remove(criterion);
 				if (property != null && value.getInt() > 0) {
 					model.add(endpointResource, property, value);
 				}

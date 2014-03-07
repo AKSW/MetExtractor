@@ -1,6 +1,8 @@
 package org.deri.hcls.metex;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -8,6 +10,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang.math.RandomUtils;
 import org.apache.jena.riot.RiotException;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.ResourceHelper;
@@ -33,6 +37,10 @@ import com.hp.hpl.jena.vocabulary.DCTerms;
 import com.hp.hpl.jena.vocabulary.OWL;
 import com.hp.hpl.jena.vocabulary.RDF;
 import com.hp.hpl.jena.vocabulary.RDFS;
+import com.thetransactioncompany.jsonrpc2.JSONRPC2Request;
+import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
+import com.thetransactioncompany.jsonrpc2.client.JSONRPC2Session;
+import com.thetransactioncompany.jsonrpc2.client.JSONRPC2SessionException;
 
 public class DescriberAndExtractor {
 
@@ -42,6 +50,7 @@ public class DescriberAndExtractor {
 	private Set<Endpoint> endpoints = new HashSet<Endpoint>();
 	private Map<String, ExtractorServiceAdapter> adapterRegistry = new HashMap<String, ExtractorServiceAdapter>();
 	private Map<String, Model> models = new HashMap<String, Model>();
+	private Collection<ExtractorServiceAdapter> services;
 
 	public static void main(String args[]) {
 		DescriberAndExtractor describerAndExtractor = new DescriberAndExtractor();
@@ -82,10 +91,13 @@ public class DescriberAndExtractor {
 	public Model getModelFor(String adapterName) {
 		String modelUri = baseNs + adapterName + "/";
 		if (!models.containsKey(modelUri)) {
-			Resource siteModelResource = siteModel.createResource(baseNs);
-			Resource adapterModelResource = siteModel.createResource(modelUri);
-			siteModelResource.addProperty(OWL.imports, adapterModelResource);
 			Model adapterModel = VirtModel.openDatabaseModel(modelUri, ds);
+			Resource siteModelResource = siteModel.createResource(baseNs);
+			Resource adapterModelResource = adapterModel
+					.createResource(modelUri);
+			siteModelResource.addProperty(OWL.imports, adapterModelResource);
+			adapterModelResource.addProperty(RDFS.label, "MetEx: "
+					+ adapterName);
 			models.put(modelUri, adapterModel);
 		}
 		return models.get(modelUri);
@@ -137,6 +149,20 @@ public class DescriberAndExtractor {
 	}
 
 	public void run() {
+
+		services = new ArrayList<ExtractorServiceAdapter>();
+		services.add(getAdapter("datahub"));
+		services.add(getAdapter("voidstore"));
+		services.add(getAdapter("lodstats"));
+		services.add(getAdapter("sindice"));
+		services.add(getAdapter("manualextractor"));
+
+		for (ExtractorServiceAdapter service : services) {
+			getModelFor(service);
+		}
+
+		registerModelsAtOntoWiki();
+
 		/*
 		 * TODO see if we can run this in multiple threads
 		 */
@@ -158,11 +184,13 @@ public class DescriberAndExtractor {
 
 		boolean available = false;
 
+		String timeStamp = ResourceHelper.getCurrentTimeStamp();
 		Resource statusResource = ResourceHelper
 				.createRandomResource(siteModel);
 		statusResource.addProperty(RDF.type, Vocabularies.ENDS_STATUS);
-		statusResource.addProperty(DCTerms.date,
-				ResourceHelper.getCurrentTimeStamp());
+		statusResource.addProperty(DCTerms.date, timeStamp);
+		statusResource.addProperty(RDFS.label, "Status of " + endpoint.getUri()
+				+ " @ " + timeStamp);
 		try {
 			// This will throw an exception, if the endpoint is not available
 			available = endpoint.isAvailable();
@@ -207,25 +235,13 @@ public class DescriberAndExtractor {
 			Model endpointMetadata = endpoint.getMetadata();
 			Model manualModel = getModelFor("manual");
 
-			if (writeToVirtuoso(endpointMetadata, endpointResource,manualModel)) {
+			if (writeToVirtuoso(endpointMetadata, endpointResource, manualModel)) {
 				System.err.println("Writing LD for " + endpoint.getUri()
 						+ " … done");
 			} else {
 				System.err.println("No LD metadata was found for endpoint "
 						+ endpoint.getUri());
 			}
-
-			/*
-			 * if still metadata is missing, try to request it from external
-			 * services
-			 */
-
-			Collection<ExtractorServiceAdapter> services = new ArrayList<ExtractorServiceAdapter>();
-			services.add(getAdapter("datahub"));
-			services.add(getAdapter("voidstore"));
-			services.add(getAdapter("lodstats"));
-			services.add(getAdapter("sindice"));
-			services.add(getAdapter("manualextractor"));
 
 			int i = 0;
 			int num = services.size();
@@ -291,7 +307,8 @@ public class DescriberAndExtractor {
 			ExtractorServiceAdapter adapter;
 
 			if (adapterName.toLowerCase().equals("sindice")) {
-				Model sindiceModel = getModelFor(SindiceAdapter.class.getSimpleName());
+				Model sindiceModel = getModelFor(SindiceAdapter.class
+						.getSimpleName());
 				adapter = new SindiceAdapter(sindiceModel);
 			} else if (adapterName.toLowerCase().equals("datahub")) {
 				adapter = new DatahubAdapter();
@@ -342,5 +359,45 @@ public class DescriberAndExtractor {
 			}
 			return true;
 		}
+	}
+
+	private void registerModelsAtOntoWiki() {
+		try {
+			int requestID = RandomUtils.nextInt();
+			URL ontoWikiUrl = new URL(this.baseNs + "jsonrpc/model/");
+
+			JSONRPC2Session owSession = new JSONRPC2Session(ontoWikiUrl);
+
+			String user = Base64.encodeBase64String("Admin".getBytes());
+			String password = Base64.encodeBase64String("".getBytes());
+
+			String authoricationValue = "Basic " + user + ':' + password;
+			owSession.addRequestProperty("Authorization", authoricationValue);
+
+			String method = "create";
+			Map<String, Object> params = new HashMap<String, Object>();
+
+			for (String modelIri : models.keySet()) {
+				params.put("modelIri", modelIri);
+				JSONRPC2Request request = new JSONRPC2Request(method, requestID);
+				request.setNamedParams(params);
+				JSONRPC2Response response = owSession.send(request);
+
+				// Print response result / error
+				if (response.indicatesSuccess()) {
+					System.out.println(response.getResult());
+				} else {
+					System.out.println(response.getError().getMessage());
+				}
+			}
+
+		} catch (MalformedURLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JSONRPC2SessionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 }

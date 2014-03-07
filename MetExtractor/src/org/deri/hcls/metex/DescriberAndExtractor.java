@@ -19,6 +19,7 @@ import org.deri.hcls.metex.adapters.VoidStoreAdapter;
 import org.deri.hcls.vocabulary.VOIDX;
 import org.deri.hcls.vocabulary.Vocabularies;
 
+import virtuoso.jdbc4.VirtuosoDataSource;
 import virtuoso.jena.driver.VirtModel;
 
 import com.hp.hpl.jena.query.QueryException;
@@ -29,14 +30,18 @@ import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.shared.AddDeniedException;
 import com.hp.hpl.jena.sparql.engine.http.QueryExceptionHTTP;
 import com.hp.hpl.jena.vocabulary.DCTerms;
+import com.hp.hpl.jena.vocabulary.OWL;
 import com.hp.hpl.jena.vocabulary.RDF;
 import com.hp.hpl.jena.vocabulary.RDFS;
 
 public class DescriberAndExtractor {
 
+	private VirtuosoDataSource ds;
+	private Model siteModel;
+	private String baseNs;
 	private Set<Endpoint> endpoints = new HashSet<Endpoint>();
-	private Model model;
 	private Map<String, ExtractorServiceAdapter> adapterRegistry = new HashMap<String, ExtractorServiceAdapter>();
+	private Map<String, Model> models = new HashMap<String, Model>();
 
 	public static void main(String args[]) {
 		DescriberAndExtractor describerAndExtractor = new DescriberAndExtractor();
@@ -51,22 +56,46 @@ public class DescriberAndExtractor {
 			/*
 			 * Fetch a list of endpoints
 			 */
-			describerAndExtractor.fetchListOfEndpoints(10);
+			describerAndExtractor.fetchListOfEndpoints(10, true);
 		}
 		describerAndExtractor.run();
 	}
 
 	public DescriberAndExtractor() {
+		this.baseNs = "http://metex.hcls.deri.org/";
 		/*
 		 * create a persistent model so we can store it for further requests
 		 */
-		model = VirtModel.openDatabaseModel("http://metex.hcls.deri.org/",
-				"jdbc:virtuoso://localhost:1111", "dba", "dba");
+		ds = new VirtuosoDataSource();
+		ds.setServerName("localhost");
+		ds.setPortNumber(1111);
+		ds.setUser("dba");
+		ds.setPassword("dba");
+		// "jdbc:virtuoso://localhost:1111", "dba", "dba"
+		siteModel = VirtModel.openDatabaseModel(baseNs, ds);
+	}
+
+	public Model getModelFor(ExtractorServiceAdapter adapter) {
+		return getModelFor(adapter.getClass().getSimpleName());
+	}
+
+	public Model getModelFor(String adapterName) {
+		String modelUri = baseNs + adapterName + "/";
+		if (!models.containsKey(modelUri)) {
+			Resource siteModelResource = siteModel.createResource(baseNs);
+			Resource adapterModelResource = siteModel.createResource(modelUri);
+			siteModelResource.addProperty(OWL.imports, adapterModelResource);
+			Model adapterModel = VirtModel.openDatabaseModel(modelUri, ds);
+			models.put(modelUri, adapterModel);
+		}
+		return models.get(modelUri);
 	}
 
 	public void addEndpoint(String endpointUri) {
-		Endpoint endpoint = new Endpoint(endpointUri, model);
-		endpoints.add(endpoint);
+		if (!endpointUri.equals("")) {
+			Endpoint endpoint = new Endpoint(endpointUri, siteModel);
+			endpoints.add(endpoint);
+		}
 	}
 
 	public void addAllEndpoints(Collection<String> endpointUris) {
@@ -75,7 +104,7 @@ public class DescriberAndExtractor {
 		}
 	}
 
-	public void fetchListOfEndpoints(int limit) {
+	public void fetchListOfEndpoints(int limit, boolean printLists) {
 		Collection<EndpointListProviderAdapter> services = new ArrayList<EndpointListProviderAdapter>();
 		services.add(new DatahubAdapter());
 		services.add(new VoidStoreAdapter(Endpoint.datasetFetchProperties));
@@ -91,8 +120,16 @@ public class DescriberAndExtractor {
 				addAllEndpoints(adapterEndpoints);
 
 				System.out.println("We got " + adapterEndpoints.size()
-						+ " endpoints from " + adapter.getClass().getName()
-						+ ", now we have " + endpoints.size() + " in total");
+						+ " endpoints from "
+						+ adapter.getClass().getSimpleName() + ", now we have "
+						+ endpoints.size() + " in total");
+
+				if (printLists) {
+					for (String endpointUri : adapterEndpoints) {
+						System.out.println(endpointUri);
+					}
+				}
+
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -108,7 +145,7 @@ public class DescriberAndExtractor {
 					+ endpoint.getUri());
 			runForEndpoint(endpoint);
 
-			model.commit();
+			siteModel.commit();
 		}
 
 		System.err.println("Done");
@@ -121,7 +158,8 @@ public class DescriberAndExtractor {
 
 		boolean available = false;
 
-		Resource statusResource = ResourceHelper.createRandomResource(model);
+		Resource statusResource = ResourceHelper
+				.createRandomResource(siteModel);
 		statusResource.addProperty(RDF.type, Vocabularies.ENDS_STATUS);
 		statusResource.addProperty(DCTerms.date,
 				ResourceHelper.getCurrentTimeStamp());
@@ -150,7 +188,7 @@ public class DescriberAndExtractor {
 			available = false;
 		} catch (Exception e) {
 			System.err.println("Caut an exception of type: "
-					+ e.getClass().getName());
+					+ e.getClass().getSimpleName());
 			e.printStackTrace();
 			available = false;
 		}
@@ -167,8 +205,9 @@ public class DescriberAndExtractor {
 			 * datasets
 			 */
 			Model endpointMetadata = endpoint.getMetadata();
+			Model manualModel = getModelFor("manual");
 
-			if (writeToVirtuoso(endpointMetadata, endpointResource)) {
+			if (writeToVirtuoso(endpointMetadata, endpointResource,manualModel)) {
 				System.err.println("Writing LD for " + endpoint.getUri()
 						+ " … done");
 			} else {
@@ -195,7 +234,7 @@ public class DescriberAndExtractor {
 			System.err.println("Will get data from " + num + " services");
 			for (ExtractorServiceAdapter service : services) {
 				i++;
-				serviceName = service.getClass().getName();
+				serviceName = service.getClass().getSimpleName();
 
 				System.err.print(i + "/" + num + " (" + serviceName + "): ");
 
@@ -204,13 +243,16 @@ public class DescriberAndExtractor {
 					continue;
 				}
 
+				Model adapterModel = getModelFor(service);
+
 				success = -1;
 				System.err.println("start getting metadata.");
 
 				try {
 					Model metadata = service.getMetadata(endpoint.getUri());
 					if (metadata != null) {
-						if (writeToVirtuoso(metadata, endpointResource)) {
+						if (writeToVirtuoso(metadata, endpointResource,
+								adapterModel)) {
 							success = 1;
 						}
 					} else {
@@ -249,7 +291,8 @@ public class DescriberAndExtractor {
 			ExtractorServiceAdapter adapter;
 
 			if (adapterName.toLowerCase().equals("sindice")) {
-				adapter = new SindiceAdapter(model);
+				Model sindiceModel = getModelFor(SindiceAdapter.class.getSimpleName());
+				adapter = new SindiceAdapter(sindiceModel);
 			} else if (adapterName.toLowerCase().equals("datahub")) {
 				adapter = new DatahubAdapter();
 			} else if (adapterName.toLowerCase().equals("voidstore")) {
@@ -269,13 +312,13 @@ public class DescriberAndExtractor {
 	}
 
 	private boolean writeToVirtuoso(Model modelToWrite,
-			Resource endpointResource) {
+			Resource endpointResource, Model writeTo) {
 		if (modelToWrite.isEmpty()) {
 			System.err.println("model is empty");
 			return false;
 		} else {
 			try {
-				this.model.add(modelToWrite);
+				writeTo.add(modelToWrite);
 			} catch (AddDeniedException e) {
 				System.err
 						.println("error writing to virtuoso, try it for each single statement");
@@ -289,7 +332,7 @@ public class DescriberAndExtractor {
 								+ stmt.getSubject().getURI() + " "
 								+ stmt.getPredicate().getURI() + " "
 								+ stmt.getObject().toString());
-						this.model.add(stmt);
+						writeTo.add(stmt);
 					} catch (AddDeniedException ee) {
 						endpointResource.addLiteral(RDFS.comment,
 								"Error when adding gathered statements to virtuoso model: "

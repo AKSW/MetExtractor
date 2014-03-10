@@ -1,5 +1,8 @@
 # MetEx – Metadata Extractor
 
+## Run instructions
+To run this programm you will need a configuration file in turtle. This file should describe a configuration resource, which is selected as run resource.
+
 ## Requirements
 
   * [Virtuoso Jena Bindings](http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/VOSDownload#Jena%20Provider) see also the [Virtuoso documentation about this topic](http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/VirtJenaProvider)

@@ -20,6 +20,7 @@ import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.ResourceHelper;
 import org.deri.hcls.metex.adapters.DatahubAdapter;
 import org.deri.hcls.metex.adapters.LODStatsAdapter;
+import org.deri.hcls.metex.adapters.LinkedDataAdapter;
 import org.deri.hcls.metex.adapters.ManualExtractorAdapter;
 import org.deri.hcls.metex.adapters.SindiceAdapter;
 import org.deri.hcls.metex.adapters.VoidStoreAdapter;
@@ -57,13 +58,16 @@ public class DescriberAndExtractor {
 			+ "baseUri");
 	public static final Property CONF_owBaseUri = ontModel
 			.createProperty(CONF_NS + "owBaseUri");
+	public static final Property CONF_owUser = ontModel.createProperty(CONF_NS
+			+ "owUser");
+	public static final Property CONF_owPassword = ontModel
+			.createProperty(CONF_NS + "owPassword");
 	public static final Property CONF_endpointsFetchLimit = ontModel
 			.createProperty(CONF_NS + "endpointFetchLimit");
 	public static final Property CONF_endpointsPrintLists = ontModel
 			.createProperty(CONF_NS + "endpointsPrintLists");
 	public static final Property CONF_endpoint = ontModel
 			.createProperty(CONF_NS + "endpoint");
-	
 
 	private VirtuosoDataSource ds;
 	private Model siteModel;
@@ -111,7 +115,7 @@ public class DescriberAndExtractor {
 		 */
 
 		VirtuosoConfiguration virtDsConf = config.getVirtuosoConfig();
-		
+
 		ds = new VirtuosoDataSource();
 		ds.setServerName(virtDsConf.serverName);
 		ds.setPortNumber(virtDsConf.portNumber);
@@ -154,7 +158,7 @@ public class DescriberAndExtractor {
 
 	public void fetchListOfEndpoints() {
 
-		int limit = config.getPropertyAsInt(CONF_endpointsFetchLimit, 10);
+		int limit = config.getPropertyAsInt(CONF_endpointsFetchLimit, -1);
 		boolean printLists = config.getPropertyAsBoolen(
 				CONF_endpointsPrintLists, false);
 
@@ -192,9 +196,9 @@ public class DescriberAndExtractor {
 	public void run() {
 
 		String endpointUri = config.getPropertyAsString(CONF_endpoint, null);
-		
+
 		System.err.println("The configured endpoint is: " + endpointUri);
-		
+
 		if (endpointUri != null) {
 			/*
 			 * configure a single endpoint
@@ -206,8 +210,9 @@ public class DescriberAndExtractor {
 			 */
 			fetchListOfEndpoints();
 		}
-		
+
 		services = new ArrayList<ExtractorServiceAdapter>();
+		services.add(getAdapter("linkeddata"));
 		services.add(getAdapter("datahub"));
 		services.add(getAdapter("voidstore"));
 		services.add(getAdapter("lodstats"));
@@ -223,9 +228,12 @@ public class DescriberAndExtractor {
 		/*
 		 * TODO see if we can run this in multiple threads
 		 */
+		int numOfEndpoints = endpoints.size();
+		int i = 0;
 		for (Endpoint endpoint : endpoints) {
-			System.err.println("Get metadata for endpoint: "
-					+ endpoint.getUri());
+			i++;
+			System.err.println(i + "/" + numOfEndpoints
+					+ ": Get metadata for endpoint: " + endpoint.getUri());
 			runForEndpoint(endpoint);
 
 			siteModel.commit();
@@ -378,6 +386,8 @@ public class DescriberAndExtractor {
 				adapter = new VoidStoreAdapter(Endpoint.datasetFetchProperties);
 			} else if (adapterName.toLowerCase().equals("lodstats")) {
 				adapter = new LODStatsAdapter();
+			} else if (adapterName.toLowerCase().equals("linkeddata")) {
+				adapter = new LinkedDataAdapter();
 			} else if (adapterName.toLowerCase().equals("manualextractor")) {
 				adapter = new ManualExtractorAdapter(
 						Endpoint.endpointProperties);
@@ -426,16 +436,21 @@ public class DescriberAndExtractor {
 	private void registerModelsAtOntoWiki() {
 		try {
 			int requestID = RandomUtils.nextInt();
-			String owBaseUri = config.getPropertyAsString(CONF_owBaseUri, baseNs);
+			String owBaseUri = config.getPropertyAsString(CONF_owBaseUri,
+					baseNs);
+			String owUser = config.getPropertyAsString(CONF_owUser, "Admin");
+			String owPassword = config.getPropertyAsString(CONF_owPassword, "");
 			URL ontoWikiUrl = new URL(owBaseUri + "jsonrpc/model/");
 
 			JSONRPC2Session owSession = new JSONRPC2Session(ontoWikiUrl);
 
-			String user = Base64.encodeBase64String("Admin".getBytes());
-			String password = Base64.encodeBase64String("".getBytes());
+			String authString = owUser + ':' + owPassword;
 
-			String authoricationValue = "Basic " + user + ':' + password;
-			owSession.addRequestProperty("Authorization", authoricationValue);
+			String authStringEnc = Base64.encodeBase64String(authString
+					.getBytes());
+
+			String authorizationValue = "Basic " + authStringEnc;
+			owSession.addRequestProperty("Authorization", authorizationValue);
 
 			String method = "create";
 			Map<String, Object> params = new HashMap<String, Object>();

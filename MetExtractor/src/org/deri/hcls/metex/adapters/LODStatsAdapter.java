@@ -1,9 +1,14 @@
 package org.deri.hcls.metex.adapters;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.jena.atlas.json.JSON;
+import org.apache.jena.atlas.json.JsonValue;
 import org.deri.hcls.Endpoint;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.metex.ExtractorServiceAdapter;
@@ -94,7 +99,23 @@ public class LODStatsAdapter implements ExtractorServiceAdapter {
 
 	@Override
 	public String getServiceLink(String endpointUri) {
-		return "http://stats.lod2.eu/datasets/" + endpointUri;
+		String lodStatsLookup = "http://stats.lod2.eu/datasets/" + endpointUri;
+		try {
+			URL url = new URL(lodStatsLookup);
+			URLConnection conn = url.openConnection();
+			InputStream inputstream = conn.getInputStream();
+
+			JsonValue serviceLinkValue = JSON.parseAny(inputstream);
+			if (serviceLinkValue.isString()) {
+				String serviceLink = serviceLinkValue.getAsString().value();
+				if (!serviceLink.isEmpty()) {
+					return serviceLink;
+				}
+			}
+		} catch (IOException e) {
+
+		}
+		return null;
 	}
 
 	@Override

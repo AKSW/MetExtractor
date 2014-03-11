@@ -65,11 +65,14 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 
 	private Endpoint voidStoreEndpoint;
 	private Collection<String> datasetProperties;
+	private Map<String, String> termSubstitutions;
 
-	public VoidStoreAdapter(Collection<String> properties) {
+	public VoidStoreAdapter(Collection<String> properties,
+			Map<String, String> termSubstitutions) {
 		Model model = ModelFactory.createDefaultModel();
 		voidStoreEndpoint = new Endpoint(ENDPOINT_URI, model);
 		datasetProperties = properties;
+		this.termSubstitutions = termSubstitutions;
 	}
 
 	@Override
@@ -183,10 +186,8 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 				Resource ds = solution.get("ds").asResource();
 				String predicateUri = solution.get("p").asResource().getURI();
 				if (properties != null && properties.contains(predicateUri)) {
-					if (org.deri.hcls.metex.Endpoint.termSubstitutions
-							.containsKey(predicateUri)) {
-						predicateUri = org.deri.hcls.metex.Endpoint.termSubstitutions
-								.get(predicateUri);
+					if (termSubstitutions.containsKey(predicateUri)) {
+						predicateUri = termSubstitutions.get(predicateUri);
 					}
 					Property p = model.createProperty(predicateUri);
 					RDFNode o = solution.get("o");
@@ -218,12 +219,17 @@ public class VoidStoreAdapter implements ExtractorServiceAdapter,
 
 							for (RDFNode value : values) {
 								if (value.isLiteral()) {
-									String formatUri = mimeToFormat.get(value.asLiteral().getString());
-									Resource format = model.createProperty(formatUri);
-									
-									model.add(endpoint, Vocabularies.SD_resultFormat, format);
+									String formatUri = mimeToFormat.get(value
+											.asLiteral().getString());
+									Resource format = model
+											.createProperty(formatUri);
+
+									model.add(endpoint,
+											Vocabularies.SD_resultFormat,
+											format);
 								} else if (value.isURIResource()) {
-									model.add(endpoint, Vocabularies.SD_resultFormat, value);
+									model.add(endpoint,
+											Vocabularies.SD_resultFormat, value);
 								}
 							}
 						} catch (Exception e) {

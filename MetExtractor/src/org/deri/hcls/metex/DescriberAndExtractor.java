@@ -114,19 +114,19 @@ public class DescriberAndExtractor {
 
 	public DescriberAndExtractor(Configuration config) {
 		this.config = config;
-		
-        /*
-         * configure Log4J to be used by Jena
-         */
-        Appender logAppender = new ConsoleAppender(new PatternLayout(),
-                ConsoleAppender.SYSTEM_ERR);
-        BasicConfigurator.configure(logAppender);
-        if (config.verbose()) {
-            LogManager.getRootLogger().setLevel(Level.DEBUG);
-        } else {
-            LogManager.getRootLogger().setLevel(Level.ERROR);
-        }
-		
+
+		/*
+		 * configure Log4J to be used by Jena
+		 */
+		Appender logAppender = new ConsoleAppender(new PatternLayout(),
+				ConsoleAppender.SYSTEM_ERR);
+		BasicConfigurator.configure(logAppender);
+		if (config.verbose()) {
+			LogManager.getRootLogger().setLevel(Level.DEBUG);
+		} else {
+			LogManager.getRootLogger().setLevel(Level.ERROR);
+		}
+
 		this.baseNs = config.getPropertyAsString(CONF_baseUri,
 				"http://metex.hcls.deri.org/");
 
@@ -184,7 +184,8 @@ public class DescriberAndExtractor {
 
 		Collection<EndpointListProviderAdapter> services = new ArrayList<EndpointListProviderAdapter>();
 		services.add(new DatahubAdapter());
-		services.add(new VoidStoreAdapter(Endpoint.datasetFetchProperties));
+		services.add(new VoidStoreAdapter(Endpoint.datasetFetchProperties,
+				Endpoint.termSubstitutions));
 
 		for (EndpointListProviderAdapter adapter : services) {
 			try {
@@ -388,7 +389,8 @@ public class DescriberAndExtractor {
 			} else if (adapterName.toLowerCase().equals("datahub")) {
 				adapter = new DatahubAdapter();
 			} else if (adapterName.toLowerCase().equals("voidstore")) {
-				adapter = new VoidStoreAdapter(Endpoint.datasetFetchProperties);
+				adapter = new VoidStoreAdapter(Endpoint.datasetFetchProperties,
+						Endpoint.termSubstitutions);
 			} else if (adapterName.toLowerCase().equals("lodstats")) {
 				adapter = new LODStatsAdapter();
 			} else if (adapterName.toLowerCase().equals("linkeddata")) {

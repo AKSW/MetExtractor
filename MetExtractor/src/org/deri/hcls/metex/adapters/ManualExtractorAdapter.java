@@ -62,34 +62,52 @@ public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 			try {
 				if (property.equals(VOID.triples.getURI())) {
 					Literal countLiteral = getTripleCount(endpoint);
-					endpointResource.addProperty(VOID.triples, countLiteral);
+					if (countLiteral != null) {
+						endpointResource
+								.addProperty(VOID.triples, countLiteral);
+					}
 
 				} else if (property.equals(VOID.entities.getURI())) {
 					Literal countLiteral = getEntitiyCount(endpoint);
-					endpointResource.addProperty(VOID.classes, countLiteral);
+					if (countLiteral != null) {
+						endpointResource
+								.addProperty(VOID.classes, countLiteral);
+					}
 
 				} else if (property.equals(VOID.classes.getURI())) {
 					Literal countLiteral = getClassCount(endpoint);
-					endpointResource.addProperty(VOID.classes, countLiteral);
+					if (countLiteral != null) {
+						endpointResource
+								.addProperty(VOID.classes, countLiteral);
+					}
 
 				} else if (property.equals(VOID.properties.getURI())) {
 					Literal countLiteral = getPropertyCount(endpoint);
-					endpointResource.addProperty(VOID.properties, countLiteral);
+					if (countLiteral != null) {
+						endpointResource.addProperty(VOID.properties,
+								countLiteral);
+					}
 
 				} else if (property.equals(VOID.distinctSubjects.getURI())) {
 					Literal countLiteral = getSubjectCount(endpoint);
-					endpointResource.addProperty(VOID.distinctSubjects,
-							countLiteral);
+					if (countLiteral != null) {
+						endpointResource.addProperty(VOID.distinctSubjects,
+								countLiteral);
+					}
 
 				} else if (property.equals(VOID.distinctObjects.getURI())) {
 					Literal countLiteral = getObjectCount(endpoint);
-					endpointResource.addProperty(VOID.distinctObjects,
-							countLiteral);
+					if (countLiteral != null) {
+						endpointResource.addProperty(VOID.distinctObjects,
+								countLiteral);
+					}
 
 				} else if (property.equals(VOIDX.blankNodeCount.getURI())) {
 					Literal countLiteral = getBnodeCount(endpoint);
-					endpointResource.addProperty(VOIDX.blankNodeCount,
-							countLiteral);
+					if (countLiteral != null) {
+						endpointResource.addProperty(VOIDX.blankNodeCount,
+								countLiteral);
+					}
 
 				} else if (property.equals(VOIDX.namespaceCount.getURI())) {
 					/*

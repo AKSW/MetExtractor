@@ -12,12 +12,28 @@
           mxConf:endpointsPrintLists "false"^^xsd:boolean .
 
 <chris> a conf:Configuration ;
+        conf:virtuoso <virtuoso> ;
+        mxConf:baseUri <http://metex.hcls.deri.org/> ;
+        mxConf:owBaseUri <http://metex.hcls.deri.org/> ;
+        mxConf:endpoint <http://chris.rkbexplorer.com/sparql/> .
+
+<ibm> a conf:Configuration ;
+      conf:virtuoso <virtuoso> ;
+      mxConf:baseUri <http://metex.hcls.deri.org/> ;
+      mxConf:owBaseUri <http://metex.hcls.deri.org/> ;
+      mxConf:endpoint <http://ibm.rkbexplorer.com/sparql/> .
+
+<sgd> a conf:Configuration ;
+      conf:virtuoso <virtuoso> ;
+      mxConf:baseUri <http://metex.hcls.deri.org/> ;
+      mxConf:owBaseUri <http://metex.hcls.deri.org/> ;
+      mxConf:endpoint <http://sgd.bio2rdf.org/sparql> .
+
+<dbpedia> a conf:Configuration ;
           conf:virtuoso <virtuoso> ;
-          mxConf:endpoint <http://chris.rkbexplorer.com/sparql/> ;
           mxConf:baseUri <http://metex.hcls.deri.org/> ;
           mxConf:owBaseUri <http://metex.hcls.deri.org/> ;
-          mxConf:endpointsFetchLimit "5" ;
-          mxConf:endpointsPrintLists "false"^^xsd:boolean .
+          mxConf:endpoint <http://dbpedia.org/sparql/> .
 
 <virtuoso> a conf:Configuration ;
            conf:virtServerName "localhost" ;

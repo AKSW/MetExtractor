@@ -13,12 +13,19 @@ import java.util.Set;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.math.RandomUtils;
 import org.apache.jena.riot.RiotException;
+import org.apache.log4j.Appender;
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.PatternLayout;
 import org.deri.hcls.Configuration;
 import org.deri.hcls.Configuration.VirtuosoConfiguration;
 import org.deri.hcls.HelpException;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.ResourceHelper;
 import org.deri.hcls.metex.adapters.DatahubAdapter;
+import org.deri.hcls.metex.adapters.GuessLDAdapter;
 import org.deri.hcls.metex.adapters.LODStatsAdapter;
 import org.deri.hcls.metex.adapters.LinkedDataAdapter;
 import org.deri.hcls.metex.adapters.ManualExtractorAdapter;
@@ -107,6 +114,19 @@ public class DescriberAndExtractor {
 
 	public DescriberAndExtractor(Configuration config) {
 		this.config = config;
+		
+        /*
+         * configure Log4J to be used by Jena
+         */
+        Appender logAppender = new ConsoleAppender(new PatternLayout(),
+                ConsoleAppender.SYSTEM_ERR);
+        BasicConfigurator.configure(logAppender);
+        if (config.verbose()) {
+            LogManager.getRootLogger().setLevel(Level.DEBUG);
+        } else {
+            LogManager.getRootLogger().setLevel(Level.ERROR);
+        }
+		
 		this.baseNs = config.getPropertyAsString(CONF_baseUri,
 				"http://metex.hcls.deri.org/");
 
@@ -213,6 +233,7 @@ public class DescriberAndExtractor {
 
 		services = new ArrayList<ExtractorServiceAdapter>();
 		services.add(getAdapter("linkeddata"));
+		services.add(getAdapter("guessld"));
 		services.add(getAdapter("datahub"));
 		services.add(getAdapter("voidstore"));
 		services.add(getAdapter("lodstats"));
@@ -292,22 +313,6 @@ public class DescriberAndExtractor {
 				available);
 
 		if (available) {
-
-			/*
-			 * get metadata from endpoint for describing the endpoint and its
-			 * datasets
-			 */
-			Model endpointMetadata = endpoint.getMetadata();
-			Model manualModel = getModelFor("manual");
-
-			if (writeToVirtuoso(endpointMetadata, endpointResource, manualModel)) {
-				System.err.println("Writing LD for " + endpoint.getUri()
-						+ " … done");
-			} else {
-				System.err.println("No LD metadata was found for endpoint "
-						+ endpoint.getUri());
-			}
-
 			int i = 0;
 			int num = services.size();
 			String serviceName, retMessage;
@@ -387,7 +392,13 @@ public class DescriberAndExtractor {
 			} else if (adapterName.toLowerCase().equals("lodstats")) {
 				adapter = new LODStatsAdapter();
 			} else if (adapterName.toLowerCase().equals("linkeddata")) {
-				adapter = new LinkedDataAdapter();
+				adapter = new LinkedDataAdapter(
+						Endpoint.endpointFetchProperties,
+						Endpoint.datasetFetchProperties,
+						Endpoint.termSubstitutions);
+			} else if (adapterName.toLowerCase().equals("guessld")) {
+				adapter = new GuessLDAdapter(Endpoint.endpointFetchProperties,
+						Endpoint.termSubstitutions);
 			} else if (adapterName.toLowerCase().equals("manualextractor")) {
 				adapter = new ManualExtractorAdapter(
 						Endpoint.endpointProperties);

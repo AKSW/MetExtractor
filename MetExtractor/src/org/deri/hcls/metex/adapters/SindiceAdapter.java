@@ -33,10 +33,11 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 	private Map<String, String> predicateStructures = new HashMap<String, String>();
 
 	/**
-	 * represents the global instance of the model. This should only be accessed for reading.
+	 * represents the global instance of the model. This should only be accessed
+	 * for reading.
 	 */
 	private Model globalModel;
-	
+
 	public SindiceAdapter(Model model) {
 		this.globalModel = model;
 	}
@@ -58,76 +59,82 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 	public Model getSindiceSummary(String endpointUri) throws Exception {
 
 		Model model = ModelFactory.createDefaultModel();
-		
-		Resource endpointResource = model.createResource(endpointUri);
-		HTTPSimpleQuery hsq = new HTTPSimpleQuery(endpointUri);
 
 		try {
-			for (Structure st : hsq) {
-				// do something here
+			Resource endpointResource = model.createResource(endpointUri);
+			HTTPSimpleQuery hsq = new HTTPSimpleQuery(endpointUri);
+			try {
+				for (Structure st : hsq) {
+					// do something here
 
-				Resource domainResource = model.createResource(st.getDomain()
-						.replaceAll("<([^>]*)>", "$1"));
-				Resource predicateResource = model.createResource(st
-						.getPredicate().replaceAll("<([^>]*)>", "$1"));
-				Resource rangeResource;
-				if (st.getRange() != null) {
-					rangeResource = model.createResource(st.getRange()
-							.replaceAll("<([^>]*)>", "$1"));
-				} else {
-					rangeResource = RDFS.Literal;
-					continue;
+					Resource domainResource = model.createResource(st
+							.getDomain().replaceAll("<([^>]*)>", "$1"));
+					Resource predicateResource = model.createResource(st
+							.getPredicate().replaceAll("<([^>]*)>", "$1"));
+					Resource rangeResource;
+					if (st.getRange() != null) {
+						rangeResource = model.createResource(st.getRange()
+								.replaceAll("<([^>]*)>", "$1"));
+					} else {
+						rangeResource = RDFS.Literal;
+						continue;
+					}
+
+					String domainStructureUri = getDomainStructure(endpointUri,
+							domainResource.getURI());
+					String predicateStructureUri = null;
+					Resource domainStructureResource;
+					Resource predicateStructureResource;
+					if (domainStructureUri == null) {
+						domainStructureResource = ResourceHelper
+								.createRandomResource(model);
+						endpointResource.addProperty(VOIDX.hasStructure,
+								domainStructureResource);
+						domainStructureResource.addProperty(VOIDX.DOMAIN,
+								domainResource);
+					} else {
+						domainStructureResource = model
+								.createResource(domainStructureUri);
+						predicateStructureUri = getPredicateStructure(
+								domainStructureUri, predicateResource.getURI());
+					}
+
+					if (predicateStructureUri == null) {
+						predicateStructureResource = ResourceHelper
+								.createRandomResource(model);
+						domainStructureResource.addProperty(VOIDX.hasPredicate,
+								predicateStructureResource);
+						predicateStructureResource.addProperty(VOIDX.PREDICATE,
+								predicateResource);
+					} else {
+						predicateStructureResource = model
+								.createResource(predicateStructureUri);
+					}
+
+					predicateStructureResource.addProperty(VOIDX.RANGE,
+							rangeResource);
 				}
-
-				String domainStructureUri = getDomainStructure(endpointUri, domainResource.getURI());
-				String predicateStructureUri = null;
-				Resource domainStructureResource;
-				Resource predicateStructureResource;
-				if (domainStructureUri == null) {
-					domainStructureResource = ResourceHelper
-							.createRandomResource(model);
-					endpointResource.addProperty(VOIDX.hasStructure,
-							domainStructureResource);
-					domainStructureResource.addProperty(VOIDX.DOMAIN,
-							domainResource);
-				} else {
-					domainStructureResource = model
-							.createResource(domainStructureUri);
-					predicateStructureUri = getPredicateStructure(domainStructureUri, predicateResource.getURI());
-				}
-
-				if (predicateStructureUri == null) {
-					predicateStructureResource = ResourceHelper
-							.createRandomResource(model);
-					domainStructureResource.addProperty(VOIDX.hasPredicate,
-							predicateStructureResource);
-					predicateStructureResource.addProperty(VOIDX.PREDICATE,
-							predicateResource);
-				} else {
-					predicateStructureResource = model
-							.createResource(predicateStructureUri);
-				}
-
-				predicateStructureResource.addProperty(VOIDX.RANGE,
-						rangeResource);
+			} finally {
+				hsq.stopConnexion();
 			}
-		} finally {
-			hsq.stopConnexion();
 
+		} catch (Exception e) {
+			System.err.println(e.getMessage());
 		}
-		
+
 		return model;
 	}
 
 	/**
 	 * Get a structure node, which describes the given domain
+	 * 
 	 * @param endpointUri
 	 * @param domainUri
 	 * @return
 	 * @throws QueryExecutionException
 	 */
-	private String getDomainStructure(String endpointUri,
-			String domainUri) throws QueryExecutionException {
+	private String getDomainStructure(String endpointUri, String domainUri)
+			throws QueryExecutionException {
 		if (domainStructures.containsKey(domainUri)) {
 			return domainStructures.get(domainUri);
 		} else {
@@ -149,13 +156,14 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 
 	/**
 	 * Get a structure node, which describes the given predicate
+	 * 
 	 * @param domainStructureUri
 	 * @param predicateUri
 	 * @return
 	 * @throws QueryExecutionException
 	 */
-	private String getPredicateStructure(String domainStructureUri, String predicateUri)
-			throws QueryExecutionException {
+	private String getPredicateStructure(String domainStructureUri,
+			String predicateUri) throws QueryExecutionException {
 		if (predicateStructures.containsKey(predicateUri)) {
 			return predicateStructures.get(predicateUri);
 		} else {
@@ -206,7 +214,11 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 			} else {
 				return null;
 			}
-		} catch (QueryParseException | ResultSetException | QueryExceptionHTTP e) {
+		} catch (QueryParseException e) {
+			throw new QueryExecutionException(query, e);
+		} catch (ResultSetException e) {
+			throw new QueryExecutionException(query, e);
+		} catch (QueryExceptionHTTP e) {
 			throw new QueryExecutionException(query, e);
 		}
 	}

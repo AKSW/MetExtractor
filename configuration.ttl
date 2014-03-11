@@ -35,6 +35,12 @@
           mxConf:owBaseUri <http://metex.hcls.deri.org/> ;
           mxConf:endpoint <http://dbpedia.org/sparql/> .
 
+<biolit> a conf:Configuration ;
+          conf:virtuoso <virtuoso> ;
+          mxConf:baseUri <http://metex.hcls.deri.org/> ;
+          mxConf:owBaseUri <http://metex.hcls.deri.org/> ;
+          mxConf:endpoint <http://biolit.rkbexplorer.com/sparql/> .
+
 <virtuoso> a conf:Configuration ;
            conf:virtServerName "localhost" ;
            conf:virtPortNumber "1111" ;

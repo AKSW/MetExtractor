@@ -512,7 +512,12 @@ public class Endpoint extends org.deri.hcls.Endpoint {
 						Set<Resource> instances = getInstances(classHit, model,
 								0);
 						instanceCandidates.addAll(instances);
-					} catch (HttpException | QueryExecutionException e) {
+					} catch (HttpException e) {
+						System.err
+								.println("Caucht exception, when fetching instances of class: "
+										+ classHit);
+						e.printStackTrace();
+					} catch (QueryExecutionException e) {
 						System.err
 								.println("Caucht exception, when fetching instances of class: "
 										+ classHit);

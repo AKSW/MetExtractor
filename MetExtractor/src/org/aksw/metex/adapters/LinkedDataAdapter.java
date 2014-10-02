@@ -1,4 +1,4 @@
-package org.deri.hcls.metex.adapters;
+package org.aksw.metex.adapters;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.aksw.metex.ExtractorServiceAdapter;
 import org.apache.jena.atlas.web.HttpException;
 import org.apache.jena.riot.RiotException;
 import org.deri.hcls.BlankNodeException;
@@ -15,7 +16,6 @@ import org.deri.hcls.Endpoint;
 import org.deri.hcls.LinkeddataHelper;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.ResourceHelper;
-import org.deri.hcls.metex.ExtractorServiceAdapter;
 import org.deri.hcls.vocabulary.VOID;
 import org.deri.hcls.vocabulary.VOIDX;
 

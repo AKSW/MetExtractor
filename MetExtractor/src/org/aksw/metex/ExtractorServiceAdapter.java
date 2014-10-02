@@ -1,4 +1,4 @@
-package org.deri.hcls.metex;
+package org.aksw.metex;
 
 import java.io.IOException;
 

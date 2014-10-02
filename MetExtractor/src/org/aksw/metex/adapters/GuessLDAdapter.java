@@ -1,4 +1,4 @@
-package org.deri.hcls.metex.adapters;
+package org.aksw.metex.adapters;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -8,11 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.aksw.metex.ExtractorServiceAdapter;
 import org.apache.jena.atlas.web.HttpException;
 import org.deri.hcls.BlankNodeException;
 import org.deri.hcls.Endpoint;
 import org.deri.hcls.QueryExecutionException;
-import org.deri.hcls.metex.ExtractorServiceAdapter;
 
 import com.hp.hpl.jena.query.QuerySolution;
 import com.hp.hpl.jena.query.ResultSet;

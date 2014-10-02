@@ -1,4 +1,4 @@
-package org.deri.hcls.metex;
+package org.aksw.metex;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -10,6 +10,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.aksw.metex.adapters.DatahubAdapter;
+import org.aksw.metex.adapters.GuessLDAdapter;
+import org.aksw.metex.adapters.LODStatsAdapter;
+import org.aksw.metex.adapters.LinkedDataAdapter;
+import org.aksw.metex.adapters.ManualExtractorAdapter;
+import org.aksw.metex.adapters.SindiceAdapter;
+import org.aksw.metex.adapters.VoidStoreAdapter;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.math.RandomUtils;
 import org.apache.jena.riot.RiotException;
@@ -24,13 +31,6 @@ import org.deri.hcls.Configuration.VirtuosoConfiguration;
 import org.deri.hcls.HelpException;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.ResourceHelper;
-import org.deri.hcls.metex.adapters.DatahubAdapter;
-import org.deri.hcls.metex.adapters.GuessLDAdapter;
-import org.deri.hcls.metex.adapters.LODStatsAdapter;
-import org.deri.hcls.metex.adapters.LinkedDataAdapter;
-import org.deri.hcls.metex.adapters.ManualExtractorAdapter;
-import org.deri.hcls.metex.adapters.SindiceAdapter;
-import org.deri.hcls.metex.adapters.VoidStoreAdapter;
 import org.deri.hcls.vocabulary.VOIDX;
 import org.deri.hcls.vocabulary.Vocabularies;
 

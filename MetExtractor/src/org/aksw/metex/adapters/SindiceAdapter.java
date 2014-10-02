@@ -1,13 +1,13 @@
-package org.deri.hcls.metex.adapters;
+package org.aksw.metex.adapters;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.aksw.metex.ExtractorServiceAdapter;
 import org.deri.hcls.Endpoint;
 import org.deri.hcls.QueryExecutionException;
 import org.deri.hcls.ResourceHelper;
-import org.deri.hcls.metex.ExtractorServiceAdapter;
 import org.deri.hcls.vocabulary.VOIDX;
 import org.sindice.summary.simple.AbstractSimpleQuery.Structure;
 import org.sindice.summary.simple.HTTPSimpleQuery;

@@ -1,4 +1,4 @@
-package org.deri.hcls.metex.adapters;
+package org.aksw.metex.adapters;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -7,11 +7,11 @@ import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.aksw.metex.ExtractorServiceAdapter;
 import org.apache.jena.atlas.json.JSON;
 import org.apache.jena.atlas.json.JsonValue;
 import org.deri.hcls.Endpoint;
 import org.deri.hcls.QueryExecutionException;
-import org.deri.hcls.metex.ExtractorServiceAdapter;
 import org.deri.hcls.vocabulary.VOID;
 
 import com.hp.hpl.jena.query.QuerySolution;

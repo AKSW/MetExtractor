@@ -51,7 +51,7 @@ public class LinkedDataAdapter implements ExtractorServiceAdapter {
 	@Override
 	public Model getMetadata(String endpointUri) throws IOException {
 		Model model = ModelFactory.createDefaultModel();
-		Resource endpointResource = model.createResource(endpointUri);
+		Resource endpointResource = model.createResource(endpointUri.trim());
 		Endpoint endpoint = new Endpoint(endpointResource);
 		return getMetadata(endpoint);
 	}

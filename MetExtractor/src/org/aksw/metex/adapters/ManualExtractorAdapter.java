@@ -184,7 +184,7 @@ public class ManualExtractorAdapter implements ExtractorServiceAdapter {
 				QuerySolution result = results.next();
 
 				try {
-					int count = result.getLiteral("count").getInt();
+					long count = result.getLiteral("count").getLong();
 					return model.createTypedLiteral(count);
 				} catch (Exception e) {
 					// totalClassCount was not a Literal

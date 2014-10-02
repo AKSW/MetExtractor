@@ -90,7 +90,7 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 								.createRandomResource(model);
 						endpointResource.addProperty(VOIDX.hasStructure,
 								domainStructureResource);
-						domainStructureResource.addProperty(VOIDX.DOMAIN,
+						domainStructureResource.addProperty(VOIDX.domain,
 								domainResource);
 					} else {
 						domainStructureResource = model
@@ -104,14 +104,14 @@ public class SindiceAdapter implements ExtractorServiceAdapter {
 								.createRandomResource(model);
 						domainStructureResource.addProperty(VOIDX.hasPredicate,
 								predicateStructureResource);
-						predicateStructureResource.addProperty(VOIDX.PREDICATE,
+						predicateStructureResource.addProperty(VOIDX.predicate,
 								predicateResource);
 					} else {
 						predicateStructureResource = model
 								.createResource(predicateStructureUri);
 					}
 
-					predicateStructureResource.addProperty(VOIDX.RANGE,
+					predicateStructureResource.addProperty(VOIDX.range,
 							rangeResource);
 				}
 			} finally {

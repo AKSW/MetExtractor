@@ -78,7 +78,7 @@ public class LODStatsAdapter implements ExtractorServiceAdapter {
 						.getURI();
 				Property property = criteriaToVoid.get(criterion);
 				criteriaToVoid.remove(criterion);
-				if (property != null && value.getInt() > 0) {
+				if (property != null && value.getLong() > 0) {
 					model.add(endpointResource, property, value);
 				}
 			}

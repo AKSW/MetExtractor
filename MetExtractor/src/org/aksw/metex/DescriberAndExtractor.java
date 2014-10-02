@@ -25,6 +25,7 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.deri.hcls.Configuration;
 import org.deri.hcls.Configuration.VirtuosoConfiguration;
@@ -86,6 +87,14 @@ public class DescriberAndExtractor {
 	private Configuration config;
 
 	public static void main(String args[]) {
+		/*
+		 * configure Log4J to be used by Jena
+		 */
+		Appender logAppender = new ConsoleAppender(new PatternLayout(),
+				ConsoleAppender.SYSTEM_ERR);
+		BasicConfigurator.configure(logAppender);
+		Logger.getRootLogger().setLevel(Level.INFO);
+
 		try {
 			Configuration config = new Configuration(args);
 
@@ -115,12 +124,6 @@ public class DescriberAndExtractor {
 	public DescriberAndExtractor(Configuration config) {
 		this.config = config;
 
-		/*
-		 * configure Log4J to be used by Jena
-		 */
-		Appender logAppender = new ConsoleAppender(new PatternLayout(),
-				ConsoleAppender.SYSTEM_ERR);
-		BasicConfigurator.configure(logAppender);
 		if (config.verbose()) {
 			LogManager.getRootLogger().setLevel(Level.DEBUG);
 		} else {
@@ -172,13 +175,13 @@ public class DescriberAndExtractor {
 
 	public void addAllEndpoints(Collection<String> endpointUris) {
 		for (String endpointUri : endpointUris) {
-			addEndpoint(endpointUri);
+			addEndpoint(endpointUri.trim());
 		}
 	}
 
 	public void fetchListOfEndpoints() {
 
-		int limit = config.getPropertyAsInt(CONF_endpointsFetchLimit, -1);
+		long limit = config.getPropertyAsInt(CONF_endpointsFetchLimit, -1);
 		boolean printLists = config.getPropertyAsBoolen(
 				CONF_endpointsPrintLists, false);
 
@@ -193,7 +196,7 @@ public class DescriberAndExtractor {
 				if (limit < 0) {
 					adapterEndpoints = adapter.getAllEndpoints();
 				} else {
-					adapterEndpoints = adapter.getSomeEndpoints(limit);
+					adapterEndpoints = adapter.getSomeEndpoints((int)limit);
 				}
 				addAllEndpoints(adapterEndpoints);
 
@@ -224,7 +227,7 @@ public class DescriberAndExtractor {
 			/*
 			 * configure a single endpoint
 			 */
-			addEndpoint(endpointUri);
+			addEndpoint(endpointUri.trim());
 		} else {
 			/*
 			 * Fetch a list of endpoints
@@ -459,8 +462,8 @@ public class DescriberAndExtractor {
 
 			String authString = owUser + ':' + owPassword;
 
-			String authStringEnc = Base64.encodeBase64String(authString
-					.getBytes());
+			String authStringEnc = new String(Base64.encodeBase64(authString
+					.getBytes()));
 
 			String authorizationValue = "Basic " + authStringEnc;
 			owSession.addRequestProperty("Authorization", authorizationValue);
